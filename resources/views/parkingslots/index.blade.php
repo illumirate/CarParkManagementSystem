@@ -16,10 +16,10 @@
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Zone Code</th>
-                <th>Zone Name</th>
-                <th>Total Slots</th>
-                <th>Available Slots</th>
+                <th>Zone</th>
+                <th>Slot Number</th>
+                <th>Status</th>
+                <th>Level</th>
                 <th colspan="2">Action</th>
             </tr>
         </thead>

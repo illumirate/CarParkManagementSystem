@@ -4,12 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Zone extends Model
+class ParkingLevel extends Model
 {
     protected $fillable = [
-        'zone_code',
-        'zone_name',
-        'type',
+        'zone_id',
+        'level_name',
         'total_slots',
         'available_slots',
     ];

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Zone;
+use App\Models\ParkingLevel;
 use Illuminate\Http\Request;
 
 class ZoneController extends Controller
@@ -32,19 +33,53 @@ class ZoneController extends Controller
         $request->validate([
             'zone_code' => 'required|string|max:50|unique:zones,zone_code',
             'zone_name' => 'required|string|max:255',
-            'total_slots' => 'required|integer|min:1',
+            'type' => 'required|in:single,multi',
         ]);
 
-        Zone::create([
+        if ($request->type === 'single') {
+            $request->validate([
+                'total_slots' => 'required|integer|min:1'
+            ]);
+
+            $zone = Zone::create([
+                'zone_code' => $request->zone_code,
+                'zone_name' => $request->zone_name,
+                'type' => 'single',
+                'total_slots' => $request->total_slots,
+                'available_slots' => $request->total_slots,
+            ]);
+
+            return redirect()->route('zones.index')->with('success', 'Zone Added Sucessfully.');
+        }
+
+        $request->validate([
+            'floors' => 'required|array|min:1',
+            'floors.*.name' => 'required|string',
+            'floors.*.slots' => 'required|integer|min:1',
+        ]);
+
+        $total = collect($request->floors)->sum('slots');
+
+        $zone = Zone::create([
             'zone_code' => $request->zone_code,
             'zone_name' => $request->zone_name,
-            'total_slots' => $request->total_slots,
-            'available_slots' => $request->total_slots, 
+            'type' => 'multi',
+            'total_slots' => $total,
+            'available_slots' => $total,
         ]);
 
-        return redirect()->route('zones.index')->with('success', 'Zone Added Sucessfully.');
+        foreach ($request->floors as $floor) {
+            ParkingLevel::create([
+                'zone_id' => $zone->id,
+                'level_name' => $floor['name'],
+                'total_slots' => $floor['slots'],
+                'available_slots' => $floor['slots'],
+            ]);
+        }
 
+        return redirect()->route('zones.index')->with('success', 'Zone Added Sucessfully.');
     }
+
 
     /**
      * Display the specified resource.
@@ -60,7 +95,8 @@ class ZoneController extends Controller
     public function edit($id)
     {
         $zone = Zone::find($id);
-        return view('zones.edit', compact('zone', 'id'));
+        $parkingLevels = ParkingLevel::where('zone_id', $zone->id)->get();
+        return view('zones.edit', compact('zone', 'id', 'parkingLevels'));
     }
 
     /**
@@ -75,8 +111,8 @@ class ZoneController extends Controller
         ]);
 
         $zone = Zone::findOrFail($id);
-        $zone->update($request->only(['zone_code','zone_name','total_slots']));
-        return redirect()->route('zones.index')->with('success','Zone successfully editted.');
+        $zone->update($request->only(['zone_code', 'zone_name', 'type', 'total_slots']));
+        return redirect()->route('zones.index')->with('success', 'Zone successfully editted.');
     }
 
     /**
@@ -84,7 +120,7 @@ class ZoneController extends Controller
      */
     public function destroy($id)
     {
-        Zone::findOrFail( $id )->delete();
-        return redirect()->route('zones.index')->with('success','Zone successfully deleted.');
+        Zone::findOrFail($id)->delete();
+        return redirect()->route('zones.index')->with('success', 'Zone successfully deleted.');
     }
 }

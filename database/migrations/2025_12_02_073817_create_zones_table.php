@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('zone_code');
             $table->string('zone_name');
+            $table->string('type');
             $table->integer('total_slots'); 
             $table->integer('available_slots');
             $table->timestamps();
