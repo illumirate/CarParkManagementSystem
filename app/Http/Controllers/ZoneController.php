@@ -104,16 +104,79 @@ class ZoneController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $request->validate([
+        $zone = Zone::findOrFail($id);
+
+        $rules = [
             'zone_code' => 'required|string|max:50|unique:zones,zone_code,' . $id,
             'zone_name' => 'required|string|max:255',
-            'total_slots' => 'required|integer|min:1',
-        ]);
+            'type' => 'required|in:single,multi',
+        ];
 
-        $zone = Zone::findOrFail($id);
-        $zone->update($request->only(['zone_code', 'zone_name', 'type', 'total_slots']));
-        return redirect()->route('zones.index')->with('success', 'Zone successfully editted.');
+        if ($request->type === 'single') {
+            $rules['total_slots'] = 'required|integer|min:1';
+        } else {
+            $rules['floors'] = 'required|array';
+        }
+
+        $request->validate($rules);
+
+        if ($request->type === 'single') {
+            $zone->update([
+                'zone_code' => $request->zone_code,
+                'zone_name' => $request->zone_name,
+                'type' => 'single',
+                'total_slots' => $request->total_slots,
+                'available_slots' => $request->total_slots,
+            ]);
+
+            ParkingLevel::where('zone_id', $zone->id)->delete();
+        }
+
+        if ($request->type === 'multi') {
+            $zone->update([
+                'zone_code' => $request->zone_code,
+                'zone_name' => $request->zone_name,
+                'type' => 'multi',
+                'total_slots' => 0,
+                'available_slots' => 0,
+            ]);
+
+            if (!empty($request->floors)) {
+                foreach ($request->floors as $key => $floor) {
+                    if ($key !== 'new') {
+                        $existing = ParkingLevel::find($floor['id'] ?? null);
+                        if ($existing) {
+                            $existing->update([
+                                'level_name' => $floor['name'],
+                                'total_slots' => $floor['slots'],
+                                'available_slots' => $floor['slots'],
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            if (isset($request->floors['new']['name'])) {
+                $names = $request->floors['new']['name'];
+                $slots = $request->floors['new']['slots'];
+
+                foreach ($names as $index => $name) {
+                    ParkingLevel::create([
+                        'zone_id' => $zone->id,
+                        'level_name' => $name,
+                        'total_slots' => $slots[$index],
+                        'available_slots' => $slots[$index],
+                    ]);
+                }
+            }
+
+            $sum = ParkingLevel::where('zone_id', $zone->id)->sum('total_slots');
+            $zone->update(['total_slots' => $sum, 'available_slots' => $sum]);
+        }
+
+        return redirect()->route('zones.index')->with('success', 'Zone updated.');
     }
+
 
     /**
      * Remove the specified resource from storage.

@@ -84,6 +84,11 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
 
 // Keep existing zone routes for backward compatibility
 Route::resource('zones', ZoneController::class);
+Route::resource('zones.floors', App\Http\Controllers\FloorController::class);
+Route::resource('zones.floors.slots', App\Http\Controllers\SlotController::class);
+Route::post('zones/{zone}/floors/{floor}/slots/generate',
+            [App\Http\Controllers\SlotController::class, 'generate'])
+            ->name('zones.floors.slots.generate');
 
 // ==================== API ROUTES (for AJAX) ====================
 Route::middleware(['auth'])->prefix('api')->group(function () {
@@ -93,4 +98,3 @@ Route::middleware(['auth'])->prefix('api')->group(function () {
 
 // ==================== WEBHOOK ROUTES ====================
 Route::post('webhook/stripe', [PaymentController::class, 'handleWebhook'])->name('webhook.stripe');
-

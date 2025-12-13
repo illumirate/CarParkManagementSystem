@@ -31,13 +31,12 @@
 
             <p>
                 <label for="type">Type:</label>
-                <select name="type" id="zone_type" class="form-control">
-                    <option value="single" {{ $zone->type == 'single' ? 'selected' : '' }}>Single-Leveled</option>
-                    <option value="multi" {{ $zone->type == 'multi' ? 'selected' : '' }}>Multi-Leveled</option>
-                </select>
+                <input type="text" class="form-control"
+                    value="{{ $zone->type == 'single' ? 'Single-Leveled' : 'Multi-Leveled' }}" readonly>
+                <input type="hidden" name="type" value="{{ $zone->type }}">
             </p>
 
-            {{-- Single level field --}}
+
             <div id="single_fields" style="display: {{ $zone->type == 'single' ? 'block' : 'none' }}">
                 <p>
                     <label for="total_slots">Total Slots:</label>
@@ -45,30 +44,12 @@
                 </p>
             </div>
 
-            {{-- Multi-level fields --}}
             <div id="multi_fields" style="display: {{ $zone->type == 'multi' ? 'block' : 'none' }}">
-                <h4>Floors</h4>
+                <h4>This is a Multi-Level Zone</h4>
 
-                <div id="floor_inputs">
-                    @if ($zone->type == 'multi')
-                        @foreach ($parkingLevels as $i => $floor)
-                            <div class="border p-2 mb-2">
-                                <label>Floor Name:</label>
-                                <input type="text" name="floors[{{ $i }}][name]"
-                                    value="{{ $floor->level_name }}">
-                                <label>Total Slots:</label>
-                                <input type="number" name="floors[{{ $i }}][slots]"
-                                    value="{{ $floor->total_slots }}">
-                            </div>
-                        @endforeach
-                    @endif
-                </div>
-
-                <p>
-                    <label for="floor_count">Add more floors:</label>
-                    <input type="number" id="floor_count" min="1">
-                    <button type="button" id="generateFloors">Generate</button>
-                </p>
+                <a href="{{ route('zones.floors.index', $zone->id) }}" class="btn btn-info mb-3">
+                    Floor Management
+                </a>
             </div>
 
             <p>
@@ -78,11 +59,11 @@
         </form>
 
     </div>
+
     <script>
         const zoneType = document.getElementById('zone_type');
         const singleFields = document.getElementById('single_fields');
         const multiFields = document.getElementById('multi_fields');
-        const floorInputs = document.getElementById('floor_inputs');
 
         zoneType.addEventListener('change', function() {
             if (this.value === 'single') {
@@ -91,22 +72,6 @@
             } else {
                 singleFields.style.display = 'none';
                 multiFields.style.display = 'block';
-            }
-        });
-
-        document.getElementById('generateFloors').addEventListener('click', function() {
-            const count = parseInt(document.getElementById('floor_count').value);
-            if (isNaN(count) || count < 1) return;
-
-            for (let i = 0; i < count; i++) {
-                floorInputs.innerHTML += `
-                <div class="border p-2 mb-2">
-                    <label>Floor Name:</label>
-                    <input type="text" name="floors[new][name][]" required>
-                    <label>Total Slots:</label>
-                    <input type="number" name="floors[new][slots][]" required>
-                </div>
-            `;
             }
         });
     </script>

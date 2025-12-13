@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\ParkingSlot;
 use App\Models\User;
 use App\Models\Vehicle;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class BookingService
@@ -33,7 +34,7 @@ class BookingService
 
         // Filter out slots that have conflicting bookings
         return $slots->filter(function ($slot) use ($date, $startTime, $endTime) {
-            return $slot->isAvailableFor($date, $startTime, $endTime);
+            return $this->isSlotAvailableFor($slot, $date, $startTime, $endTime);
         })->values();
     }
 
@@ -83,7 +84,7 @@ class BookingService
 
         return $slots->map(function ($slot) use ($date, $startTime, $endTime) {
             $isAvailable = $slot->status === 'available'
-                && $slot->isAvailableFor($date, $startTime, $endTime);
+                && $this->isSlotAvailableFor($slot, $date, $startTime, $endTime);
 
             return [
                 'id' => $slot->id,
@@ -153,5 +154,45 @@ class BookingService
         ]);
 
         return true;
+    }
+
+    // ==================== SLOT AVAILABILITY HELPERS ====================
+
+    /**
+     * Check if a slot is available for a specific date and time range.
+     */
+    public function isSlotAvailableFor(ParkingSlot $slot, string $date, string $startTime, string $endTime): bool
+    {
+        if ($slot->status !== 'available') {
+            return false;
+        }
+
+        return !$this->hasBookingConflict($slot, $date, $startTime, $endTime);
+    }
+
+    /**
+     * Check if there are any overlapping bookings for a slot.
+     */
+    public function hasBookingConflict(ParkingSlot $slot, string $date, string $startTime, string $endTime): bool
+    {
+        return Booking::where('parking_slot_id', $slot->id)
+            ->where('booking_date', $date)
+            ->whereIn('status', ['pending', 'confirmed', 'active'])
+            ->where(function ($query) use ($startTime, $endTime) {
+                $query->where(function ($q) use ($startTime, $endTime) {
+                    // New booking starts during existing booking
+                    $q->where('start_time', '<=', $startTime)
+                      ->where('end_time', '>', $startTime);
+                })->orWhere(function ($q) use ($startTime, $endTime) {
+                    // New booking ends during existing booking
+                    $q->where('start_time', '<', $endTime)
+                      ->where('end_time', '>=', $endTime);
+                })->orWhere(function ($q) use ($startTime, $endTime) {
+                    // New booking completely contains existing booking
+                    $q->where('start_time', '>=', $startTime)
+                      ->where('end_time', '<=', $endTime);
+                });
+            })
+            ->exists();
     }
 }
