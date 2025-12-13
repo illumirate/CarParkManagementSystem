@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Zone extends Model
 {
@@ -13,4 +14,16 @@ class Zone extends Model
         'total_slots',
         'available_slots',
     ];
+
+    // ==================== RELATIONSHIPS ====================
+
+    public function parkingLevels(): HasMany
+    {
+        return $this->hasMany(ParkingLevel::class);
+    }
+
+    public function parkingSlots(): HasMany
+    {
+        return $this->hasMany(ParkingSlot::class);
+    }
 }
