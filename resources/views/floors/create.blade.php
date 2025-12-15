@@ -10,7 +10,7 @@
         </div>
     @endif
     <h2>Add New Floor</h2><br />
-    <form method="post" action="{{ route('zones.floors.store', $zone->id) }}">
+    <form method="post" action="{{ route('admin.zones.floors.store', $zone->id) }}">
         @csrf
         <p>
             <label for="floor_name">Floor Name:</label>
@@ -22,7 +22,7 @@
         </p>
         <p>
             <button type="submit" class="btn btn-primary">Submit</button>
-            <a href="{{ route('zones.floors.index', $zone->id) }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ route('admin.zones.floors.index', $zone->id) }}" class="btn btn-secondary">Cancel</a>
         </p>
     </form>
 @endsection

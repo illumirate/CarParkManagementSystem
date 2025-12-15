@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\PaymentGatewayInterface;
 use App\Models\Payment;
 use App\Services\CreditService;
-use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,14 +12,49 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
+/**
+ * =============================================================================
+ * ADAPTER PATTERN - Client Class
+ * =============================================================================
+ *
+ * This controller is the CLIENT in the Adapter Pattern.
+ * It works with the PaymentGatewayInterface (Target) without knowing about
+ * the concrete payment gateway implementation (Stripe).
+ *
+ * Pattern Roles:
+ * - CLIENT: This class (PaymentController)
+ * - TARGET: PaymentGatewayInterface (the interface this client uses)
+ * - ADAPTER: StripePaymentAdapter (injected via the interface)
+ * - ADAPTEE: Stripe SDK (hidden behind the adapter)
+ *
+ * Benefits demonstrated:
+ * - Controller doesn't import or reference Stripe directly
+ * - Payment gateway can be swapped by changing the binding in AppServiceProvider
+ * - Easy to test with mock implementations
+ *
+ * @see \App\Contracts\PaymentGatewayInterface - The Target interface
+ * @see \App\Adapters\StripePaymentAdapter - The Adapter implementation
+ */
 class PaymentController extends Controller
 {
-    protected StripeService $stripeService;
+    /**
+     * The payment gateway interface (Target in Adapter Pattern).
+     *
+     * The concrete implementation (StripePaymentAdapter) is injected
+     * via Laravel's service container based on the binding in AppServiceProvider.
+     */
+    protected PaymentGatewayInterface $paymentGateway;
     protected CreditService $creditService;
 
-    public function __construct(StripeService $stripeService, CreditService $creditService)
+    /**
+     * Constructor with dependency injection.
+     *
+     * ADAPTER PATTERN: We inject the TARGET interface, not the concrete adapter.
+     * Laravel resolves this to StripePaymentAdapter based on our binding.
+     */
+    public function __construct(PaymentGatewayInterface $paymentGateway, CreditService $creditService)
     {
-        $this->stripeService = $stripeService;
+        $this->paymentGateway = $paymentGateway;
         $this->creditService = $creditService;
     }
 
@@ -55,8 +90,10 @@ class PaymentController extends Controller
         $package = $packages[$request->package];
 
         try {
-            $paymentIntent = $this->stripeService->createPaymentIntent(
-                $package['price'] * 100, // Convert to cents
+            // ADAPTER PATTERN: Call the Target interface method
+            // The adapter translates this to the Stripe SDK call
+            $paymentResult = $this->paymentGateway->createPayment(
+                (int)($package['price'] * 100), // Convert to cents
                 'myr',
                 [
                     'user_id' => Auth::id(),
@@ -65,15 +102,21 @@ class PaymentController extends Controller
                 ]
             );
 
+            // Check for errors using our standardized result
+            if ($paymentResult->errorMessage) {
+                Log::error('Payment creation failed: ' . $paymentResult->errorMessage);
+                return response()->json(['error' => 'Failed to create payment. Please try again.'], 500);
+            }
+
             // Return client secret - payment record will be created only after successful payment
             return response()->json([
-                'clientSecret' => $paymentIntent->client_secret,
+                'clientSecret' => $paymentResult->clientSecret,
                 'amount' => $package['price'],
                 'credits' => $package['credits'],
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Stripe payment intent creation failed: ' . $e->getMessage());
+            Log::error('Payment creation failed: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to create payment. Please try again.'], 500);
         }
     }
@@ -102,13 +145,13 @@ class PaymentController extends Controller
         }
 
         try {
-            // Verify payment with Stripe
-            $paymentIntent = $this->stripeService->retrievePaymentIntent($request->payment_intent_id);
+            // ADAPTER PATTERN: Retrieve payment using the Target interface
+            $paymentResult = $this->paymentGateway->getPayment($request->payment_intent_id);
 
-            if ($paymentIntent->status === 'succeeded') {
+            if ($paymentResult->isSuccessful()) {
                 // Get package info from metadata
                 $packages = $this->getCreditPackages();
-                $packageKey = $paymentIntent->metadata->package ?? null;
+                $packageKey = $paymentResult->metadata['package'] ?? null;
                 $package = $packages[$packageKey] ?? null;
 
                 if (!$package) {
@@ -118,8 +161,8 @@ class PaymentController extends Controller
                 // Create payment record only after successful payment
                 $payment = Payment::create([
                     'user_id' => Auth::id(),
-                    'stripe_payment_intent_id' => $paymentIntent->id,
-                    'stripe_payment_method_id' => $paymentIntent->payment_method,
+                    'stripe_payment_intent_id' => $paymentResult->id,
+                    'stripe_payment_method_id' => null, // Will be updated via webhook if needed
                     'amount' => $package['price'],
                     'currency' => 'MYR',
                     'status' => 'completed',
@@ -189,84 +232,6 @@ class PaymentController extends Controller
             'payments' => $payments,
             'transactions' => $transactions,
         ]);
-    }
-
-    /**
-     * Display payment receipt.
-     */
-    public function receipt(Payment $payment): View|RedirectResponse
-    {
-        if ($payment->user_id !== Auth::id()) {
-            return redirect()->route('payments.history')
-                ->withErrors(['error' => 'Unauthorized access.']);
-        }
-
-        return view('payments.receipt', [
-            'payment' => $payment,
-        ]);
-    }
-
-    /**
-     * Handle Stripe webhook.
-     */
-    public function handleWebhook(Request $request)
-    {
-        $payload = $request->getContent();
-        $sigHeader = $request->header('Stripe-Signature');
-
-        try {
-            $event = $this->stripeService->constructWebhookEvent($payload, $sigHeader);
-        } catch (\Exception $e) {
-            Log::error('Stripe webhook signature verification failed: ' . $e->getMessage());
-            return response('Invalid signature', 400);
-        }
-
-        switch ($event->type) {
-            case 'payment_intent.succeeded':
-                $this->handlePaymentSucceeded($event->data->object);
-                break;
-            case 'payment_intent.payment_failed':
-                $this->handlePaymentFailed($event->data->object);
-                break;
-        }
-
-        return response('OK', 200);
-    }
-
-    /**
-     * Handle successful payment webhook.
-     */
-    protected function handlePaymentSucceeded($paymentIntent): void
-    {
-        $payment = Payment::where('stripe_payment_intent_id', $paymentIntent->id)->first();
-
-        if ($payment && $payment->status !== 'completed') {
-            $payment->update([
-                'status' => 'completed',
-                'stripe_payment_method_id' => $paymentIntent->payment_method,
-                'paid_at' => now(),
-            ]);
-
-            $this->creditService->addCredits(
-                $payment->user,
-                $payment->credits_purchased,
-                "Credit purchase - {$payment->metadata['package_name']} Package",
-                'Payment',
-                $payment->id
-            );
-        }
-    }
-
-    /**
-     * Handle failed payment webhook.
-     */
-    protected function handlePaymentFailed($paymentIntent): void
-    {
-        $payment = Payment::where('stripe_payment_intent_id', $paymentIntent->id)->first();
-
-        if ($payment) {
-            $payment->update(['status' => 'failed']);
-        }
     }
 
     /**

@@ -11,7 +11,7 @@
 </div>
 @endif
 <h2>Add New Zone</h2><br/>
-<form method="post" action="{{ route('zones.store') }}">
+<form method="post" action="{{ route('admin.zones.store') }}">
     @csrf
     <p>
         <label for="zone_code">Zone Code:</label>

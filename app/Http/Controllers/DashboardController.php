@@ -39,11 +39,10 @@ class DashboardController extends Controller
         // Get vehicle count
         $vehicleCount = $user->vehicles()->active()->count();
 
-        // Stats
+        // Basic stats (credit balance and vehicles are local data)
+        // Booking stats will be loaded via frontend AJAX to avoid blocking
         $stats = [
             'credit_balance' => $user->credit_balance,
-            'total_bookings' => $user->bookings()->count(),
-            'completed_bookings' => $user->bookings()->where('status', 'completed')->count(),
             'vehicles' => $vehicleCount,
         ];
 

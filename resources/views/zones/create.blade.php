@@ -15,7 +15,7 @@
             </div>
         @endif
 
-        <form method="post" action="{{ route('zones.store') }}">
+        <form method="post" action="{{ route('admin.zones.store') }}">
             @csrf
 
             <p>
@@ -58,7 +58,7 @@
 
             <p>
                 <button type="submit" class="btn btn-primary">Submit</button>
-                <a href="{{ route('zones.index') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ route('admin.zones.index') }}" class="btn btn-secondary">Cancel</a>
             </p>
         </form>
     </div>

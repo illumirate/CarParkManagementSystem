@@ -59,7 +59,7 @@
                         <i class="fas fa-cog me-1"></i>Admin
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{{ route('zones.index') }}"><i class="fas fa-map-marker-alt me-2"></i>Zones</a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.zones.index') }}"><i class="fas fa-map-marker-alt me-2"></i>Zones</a></li>
                     </ul>
                 </li>
                 @endif

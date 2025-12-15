@@ -133,6 +133,43 @@ class Booking extends Model
     }
 
     /**
+     * Get formatted duration as "X hour(s) Y minute(s)"
+     */
+    public function getFormattedDuration(): string
+    {
+        $start = Carbon::parse($this->start_time);
+        $end = Carbon::parse($this->end_time);
+        $totalMinutes = $start->diffInMinutes($end);
+
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
+
+        $parts = [];
+        if ($hours > 0) {
+            $parts[] = $hours . ' hour' . ($hours !== 1 ? 's' : '');
+        }
+        if ($minutes > 0) {
+            $parts[] = $minutes . ' minute' . ($minutes !== 1 ? 's' : '');
+        }
+
+        return implode(' ', $parts) ?: '0 minutes';
+    }
+
+    /**
+     * Check if booking can be modified (before start time and not cancelled/completed)
+     */
+    public function canBeModified(): bool
+    {
+        if (!in_array($this->status, ['pending', 'confirmed'])) {
+            return false;
+        }
+
+        $bookingStart = Carbon::parse($this->booking_date->format('Y-m-d') . ' ' . $this->start_time->format('H:i:s'));
+
+        return now()->lt($bookingStart);
+    }
+
+    /**
      * Calculate fee: RM 2/hour, capped at RM 5
      */
     public static function calculateFee(string $startTime, string $endTime): float
@@ -155,7 +192,7 @@ class Booking extends Model
             return false;
         }
 
-        $bookingStart = Carbon::parse($this->booking_date->format('Y-m-d') . ' ' . $this->start_time);
+        $bookingStart = Carbon::parse($this->booking_date->format('Y-m-d') . ' ' . $this->start_time->format('H:i:s'));
 
         return now()->diffInHours($bookingStart, false) >= 2;
     }
@@ -168,7 +205,7 @@ class Booking extends Model
      */
     public function getRefundAmount(): float
     {
-        $bookingStart = Carbon::parse($this->booking_date->format('Y-m-d') . ' ' . $this->start_time);
+        $bookingStart = Carbon::parse($this->booking_date->format('Y-m-d') . ' ' . $this->start_time->format('H:i:s'));
         $hoursUntilStart = now()->diffInHours($bookingStart, false);
 
         if ($hoursUntilStart >= 2) {

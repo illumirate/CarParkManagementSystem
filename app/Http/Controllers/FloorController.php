@@ -56,7 +56,7 @@ class FloorController extends Controller
             'available_slots' => $request->total_slots,
         ]);
 
-        return redirect()->route('zones.floors.index', $zone->id)
+        return redirect()->route('admin.zones.floors.index', $zone->id)
             ->with('success', 'Floor added successfully.');
     }
 
@@ -95,7 +95,7 @@ class FloorController extends Controller
         $floor = ParkingLevel::findOrFail($floorId);
         $floor->delete();
 
-        return redirect()->route('zones.floors.index', $zoneId)->with('success', 'Floor deleted.');
+        return redirect()->route('admin.zones.floors.index', $zoneId)->with('success', 'Floor deleted.');
     }
 
 }

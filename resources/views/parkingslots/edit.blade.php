@@ -11,7 +11,7 @@
 </div>
 @endif
 <h2>Product Details</h2><br/>
-<form method="post" action="{{ route('zones.update', $id) }}">
+<form method="post" action="{{ route('admin.zones.update', $id) }}">
     @csrf
     <input name="_method" type="hidden" value="PATCH">
     <p>

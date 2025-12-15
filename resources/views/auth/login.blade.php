@@ -2,6 +2,13 @@
 
 @section('title', 'Login - TARUMT Car Park')
 
+@push('styles')
+{{-- Google reCAPTCHA Script --}}
+@if(config('services.recaptcha.site_key'))
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+@endif
+@endpush
+
 @section('content')
 <div class="row justify-content-center">
     <div class="col-md-5">
@@ -43,6 +50,16 @@
                         <label class="form-check-label" for="remember">Remember me</label>
                     </div>
 
+                    {{-- Google reCAPTCHA v2 --}}
+                    @if(config('services.recaptcha.site_key'))
+                    <div class="mb-3">
+                        <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                        @error('g-recaptcha-response')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    @endif
+
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="fas fa-sign-in-alt me-2"></i>Login
@@ -51,6 +68,16 @@
                 </form>
 
                 <hr class="my-4">
+
+                {{-- Google OAuth Login --}}
+                @if(config('services.google.client_id'))
+                <div class="d-grid mb-3">
+                    <a href="{{ route('auth.google') }}" class="btn btn-outline-danger">
+                        <i class="fab fa-google me-2"></i>Continue with Google
+                    </a>
+                </div>
+                <hr class="my-4">
+                @endif
 
                 <div class="text-center">
                     <a href="{{ route('password.request') }}" class="text-decoration-none">

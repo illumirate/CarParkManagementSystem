@@ -49,7 +49,7 @@ class ZoneController extends Controller
                 'available_slots' => $request->total_slots,
             ]);
 
-            return redirect()->route('zones.index')->with('success', 'Zone Added Sucessfully.');
+            return redirect()->route('admin.zones.index')->with('success', 'Zone Added Sucessfully.');
         }
 
         $request->validate([
@@ -77,7 +77,7 @@ class ZoneController extends Controller
             ]);
         }
 
-        return redirect()->route('zones.index')->with('success', 'Zone Added Sucessfully.');
+        return redirect()->route('admin.zones.index')->with('success', 'Zone Added Sucessfully.');
     }
 
 
@@ -174,7 +174,7 @@ class ZoneController extends Controller
             $zone->update(['total_slots' => $sum, 'available_slots' => $sum]);
         }
 
-        return redirect()->route('zones.index')->with('success', 'Zone updated.');
+        return redirect()->route('admin.zones.index')->with('success', 'Zone updated.');
     }
 
 
@@ -184,6 +184,6 @@ class ZoneController extends Controller
     public function destroy($id)
     {
         Zone::findOrFail($id)->delete();
-        return redirect()->route('zones.index')->with('success', 'Zone successfully deleted.');
+        return redirect()->route('admin.zones.index')->with('success', 'Zone successfully deleted.');
     }
 }

@@ -9,7 +9,7 @@
         @endif
 
         <div class="mb-3">
-            <form method="POST" action="{{ route('zones.floors.slots.generate', [$zone->id, $floor->id]) }}">
+            <form method="POST" action="{{ route('admin.zones.floors.slots.generate', [$zone->id, $floor->id]) }}">
                 @csrf
                 <div class="form-inline">
                     <label for="slot_count">Number of slots to generate:</label>
@@ -20,7 +20,7 @@
             </form>
         </div>
 
-        <a href="{{ route('zones.floors.index', $zone->id) }}" class="btn btn-secondary mb-3">
+        <a href="{{ route('admin.zones.floors.index', $zone->id) }}" class="btn btn-secondary mb-3">
             Back to Floors
         </a>
 
@@ -42,11 +42,11 @@
                         <td>{{ ucfirst($slot->status) }}</td>
                         <td>{{ $floor->level_name }}</td>
                         <td>
-                            <a href="{{ route('zones.floors.slots.edit', [$zone->id, $floor->id, $slot->id]) }}"
+                            <a href="{{ route('admin.zones.floors.slots.edit', [$zone->id, $floor->id, $slot->id]) }}"
                                 class="btn btn-warning">Edit</a>
                         </td>
                         <td>
-                            <form action="{{ route('zones.floors.slots.destroy', [$zone->id, $floor->id, $slot->id]) }}"
+                            <form action="{{ route('admin.zones.floors.slots.destroy', [$zone->id, $floor->id, $slot->id]) }}"
                                 method="post">
                                 @csrf
                                 @method('DELETE')

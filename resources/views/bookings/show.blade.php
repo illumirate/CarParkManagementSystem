@@ -30,8 +30,8 @@
                             </tr>
                             @endif
                             <tr>
-                                <td class="text-muted">Slot Number</td>
-                                <td><strong class="fs-5">{{ $booking->parkingSlot->slot_number }}</strong></td>
+                                <td class="text-muted">Slot ID</td>
+                                <td><strong class="fs-5">{{ $booking->parkingSlot->slot_id }}</strong></td>
                             </tr>
                         </table>
                     </div>
@@ -48,7 +48,7 @@
                             </tr>
                             <tr>
                                 <td class="text-muted">Duration</td>
-                                <td>{{ $booking->calculateDuration() }} hour(s)</td>
+                                <td>{{ $booking->getFormattedDuration() }}</td>
                             </tr>
                         </table>
                     </div>
@@ -59,12 +59,19 @@
                 <div class="row">
                     <div class="col-md-6">
                         <h6 class="text-muted mb-3">Vehicle</h6>
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-{{ $booking->vehicle->vehicle_type === 'car' ? 'car' : 'motorcycle' }} fa-2x text-muted me-3"></i>
-                            <div>
-                                <strong>{{ $booking->vehicle->plate_number }}</strong><br>
-                                <small class="text-muted">{{ $booking->vehicle->brand }} {{ $booking->vehicle->model }}</small>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-{{ $booking->vehicle->vehicle_type === 'car' ? 'car' : 'motorcycle' }} fa-2x text-muted me-3"></i>
+                                <div>
+                                    <strong>{{ $booking->vehicle->plate_number }}</strong><br>
+                                    <small class="text-muted">{{ $booking->vehicle->brand }} {{ $booking->vehicle->model }}</small>
+                                </div>
                             </div>
+                            @if($booking->canBeModified())
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changeVehicleModal">
+                                <i class="fas fa-edit me-1"></i>Change
+                            </button>
+                            @endif
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -166,6 +173,42 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Booking</button>
                     <button type="submit" class="btn btn-danger">Confirm Cancellation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- Change Vehicle Modal --}}
+@if($booking->canBeModified())
+<div class="modal fade" id="changeVehicleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('bookings.updateVehicle', $booking) }}" method="POST">
+                @csrf
+                @method('PATCH')
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Vehicle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Select a different vehicle for this booking:</p>
+
+                    <div class="mb-3">
+                        <label for="vehicle_id" class="form-label">Vehicle <span class="text-danger">*</span></label>
+                        <select class="form-select" name="vehicle_id" id="vehicle_id" required>
+                            @foreach($vehicles as $vehicle)
+                            <option value="{{ $vehicle->id }}" {{ $booking->vehicle_id == $vehicle->id ? 'selected' : '' }}>
+                                {{ $vehicle->plate_number }} ({{ ucfirst($vehicle->vehicle_type) }}) - {{ $vehicle->brand }} {{ $vehicle->model }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Vehicle</button>
                 </div>
             </form>
         </div>

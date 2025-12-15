@@ -3,20 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\UserEventService;
 use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use Laravel\Socialite\Facades\Socialite;
 
+/**
+ * OBSERVER PATTERN - Client that triggers events via UserEventService.
+ */
 class AuthController extends Controller
 {
+    protected UserEventService $userEventService;
+
+    public function __construct(UserEventService $userEventService)
+    {
+        $this->userEventService = $userEventService;
+    }
     // ==================== LOGIN ====================
 
     /**
@@ -37,6 +48,29 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
+        // Verify reCAPTCHA if configured
+        if (config('services.recaptcha.secret_key')) {
+            $recaptchaResponse = $request->input('g-recaptcha-response');
+
+            if (!$recaptchaResponse) {
+                return back()->withErrors([
+                    'g-recaptcha-response' => 'Please complete the reCAPTCHA verification.',
+                ])->onlyInput('email');
+            }
+
+            $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+                'secret' => config('services.recaptcha.secret_key'),
+                'response' => $recaptchaResponse,
+                'remoteip' => $request->ip(),
+            ]);
+
+            if (!$response->json('success')) {
+                return back()->withErrors([
+                    'g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.',
+                ])->onlyInput('email');
+            }
+        }
+
         // First check if user exists and email is verified
         $user = User::where('email', $credentials['email'])->first();
 
@@ -49,8 +83,8 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            // Update last login timestamp
-            Auth::user()->update(['last_login_at' => now()]);
+            // OBSERVER PATTERN: Notify observers of login event
+            $this->userEventService->userLoggedIn(Auth::user());
 
             return redirect()->intended(route('dashboard'));
         }
@@ -65,7 +99,14 @@ class AuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+
         Auth::logout();
+
+        // OBSERVER PATTERN: Notify observers of logout event
+        if ($user) {
+            $this->userEventService->userLoggedOut($user);
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -121,7 +162,9 @@ class AuthController extends Controller
             'credit_balance' => 0.00,
         ]);
 
-        event(new Registered($user));
+        // OBSERVER PATTERN: Notify observers of registration event
+        // This triggers WelcomeEmailObserver which sends the verification email
+        $this->userEventService->userRegistered($user);
 
         // Don't auto-login - require email verification first
         return redirect()->route('login')
@@ -244,5 +287,61 @@ class AuthController extends Controller
         $request->user()->sendEmailVerificationNotification();
 
         return back()->with('status', 'Verification link sent!');
+    }
+
+    // ==================== GOOGLE OAUTH ====================
+
+    /**
+     * Redirect to Google for authentication.
+     */
+    public function redirectToGoogle(): RedirectResponse
+    {
+        return Socialite::driver('google')->redirect();
+    }
+
+    /**
+     * Handle Google OAuth callback.
+     */
+    public function handleGoogleCallback(): RedirectResponse
+    {
+        try {
+            $googleUser = Socialite::driver('google')->user();
+
+            // Check if user already exists with this email
+            $user = User::where('email', $googleUser->getEmail())->first();
+
+            if ($user) {
+                // Existing user - link Google ID if not already linked
+                if (!$user->google_id) {
+                    $user->update(['google_id' => $googleUser->getId()]);
+                }
+            } else {
+                // Create new user from Google data
+                $user = User::create([
+                    'name' => $googleUser->getName(),
+                    'email' => $googleUser->getEmail(),
+                    'google_id' => $googleUser->getId(),
+                    'password' => Hash::make(Str::random(24)), // Random password for OAuth users
+                    'email_verified_at' => now(), // Google emails are pre-verified
+                    'user_type' => 'public', // Default user type
+                ]);
+
+                // OBSERVER PATTERN: Notify observers of registration event
+                $this->userEventService->userRegistered($user);
+            }
+
+            // Log in the user
+            Auth::login($user, true);
+
+            // OBSERVER PATTERN: Notify observers of login event
+            $this->userEventService->userLoggedIn($user);
+
+            return redirect()->intended(route('dashboard'))
+                ->with('success', 'Logged in with Google successfully!');
+
+        } catch (\Exception $e) {
+            return redirect()->route('login')
+                ->with('error', 'Google login failed. Please try again.');
+        }
     }
 }

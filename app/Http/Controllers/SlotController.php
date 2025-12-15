@@ -92,7 +92,7 @@ class SlotController extends Controller
         }
 
 
-        return redirect()->route('zones.floors.slots.index', [$zone->id, $floor->id])
+        return redirect()->route('admin..floors.slots.index', [$zone->id, $floor->id])
             ->with('success', 'Parking slots generated successfully.');
     }
 

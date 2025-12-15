@@ -15,7 +15,7 @@
             </div>
         @endif
 
-        <form method="post" action="{{ route('zones.update', $zone->id) }}">
+        <form method="post" action="{{ route('admin.zones.update', $zone->id) }}">
             @csrf
             @method('PATCH')
 
@@ -47,14 +47,14 @@
             <div id="multi_fields" style="display: {{ $zone->type == 'multi' ? 'block' : 'none' }}">
                 <h4>This is a Multi-Level Zone</h4>
 
-                <a href="{{ route('zones.floors.index', $zone->id) }}" class="btn btn-info mb-3">
+                <a href="{{ route('admin.zones.floors.index', $zone->id) }}" class="btn btn-info mb-3">
                     Floor Management
                 </a>
             </div>
 
             <p>
                 <button type="submit" class="btn btn-primary">Update Zone</button>
-                <a href="{{ route('zones.index') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ route('admin.zones.index') }}" class="btn btn-secondary">Cancel</a>
             </p>
         </form>
 

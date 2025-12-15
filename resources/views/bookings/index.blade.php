@@ -45,7 +45,7 @@
                     </div>
                     <div class="col-6">
                         <span class="text-muted">Slot</span><br>
-                        <strong>{{ $booking->parkingSlot->slot_number }}</strong>
+                        <strong>{{ $booking->parkingSlot->slot_id }}</strong>
                     </div>
                 </div>
 

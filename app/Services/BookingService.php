@@ -88,7 +88,7 @@ class BookingService
 
             return [
                 'id' => $slot->id,
-                'slot_number' => $slot->slot_number,
+                'slot_id' => $slot->slot_id,
                 'status' => $slot->status,
                 'is_available' => $isAvailable,
                 'level_name' => $slot->parkingLevel?->level_name,

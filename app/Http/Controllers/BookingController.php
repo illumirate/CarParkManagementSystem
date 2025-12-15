@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\ParkingSlot;
 use App\Models\Zone;
+use App\Notifications\BookingConfirmation;
 use App\Services\BookingService;
 use App\Services\CreditService;
 use Illuminate\Http\JsonResponse;
@@ -91,6 +92,17 @@ class BookingController extends Controller
             ], 422);
         }
 
+        // Validate start time is not in the past for today's bookings
+        if ($request->date === now()->toDateString()) {
+            $currentTime = now()->format('H:i');
+            if ($request->start_time < $currentTime) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Start time cannot be in the past.',
+                ], 422);
+            }
+        }
+
         // Validate minimum 1 hour duration
         $start = \Carbon\Carbon::parse($request->start_time);
         $end = \Carbon\Carbon::parse($request->end_time);
@@ -145,6 +157,14 @@ class BookingController extends Controller
             return back()->withErrors(['end_time' => 'Booking must end by 10:00 PM.']);
         }
 
+        // Verify start time is not in the past for today's bookings
+        if ($request->booking_date === now()->toDateString()) {
+            $currentTime = now()->format('H:i');
+            if ($request->start_time < $currentTime) {
+                return back()->withErrors(['start_time' => 'Start time cannot be in the past.']);
+            }
+        }
+
         // Verify minimum 1 hour
         $start = \Carbon\Carbon::parse($request->start_time);
         $end = \Carbon\Carbon::parse($request->end_time);
@@ -154,7 +174,7 @@ class BookingController extends Controller
 
         // Check slot availability
         $slot = ParkingSlot::findOrFail($request->parking_slot_id);
-        if (!$slot->isAvailableFor($request->booking_date, $request->start_time, $request->end_time)) {
+        if (!$this->bookingService->isSlotAvailableFor($slot, $request->booking_date, $request->start_time, $request->end_time)) {
             return back()->withErrors(['parking_slot_id' => 'This slot is no longer available for the selected time.']);
         }
 
@@ -194,6 +214,9 @@ class BookingController extends Controller
                 'confirmed_at' => now(),
             ]);
 
+            // Send booking confirmation email
+            $user->notify(new BookingConfirmation($booking));
+
             return redirect()->route('bookings.show', $booking)
                 ->with('success', 'Booking confirmed! Your parking slot has been reserved.');
 
@@ -215,9 +238,46 @@ class BookingController extends Controller
 
         $booking->load(['parkingSlot.zone', 'parkingSlot.parkingLevel', 'vehicle']);
 
+        $vehicles = Auth::user()->vehicles()->active()->get();
+
         return view('bookings.show', [
             'booking' => $booking,
+            'vehicles' => $vehicles,
         ]);
+    }
+
+    /**
+     * Update the vehicle for a booking.
+     */
+    public function updateVehicle(Request $request, Booking $booking): RedirectResponse
+    {
+        // Ensure user owns this booking
+        if ($booking->user_id !== Auth::id()) {
+            return redirect()->route('bookings.index')
+                ->withErrors(['error' => 'Unauthorized access.']);
+        }
+
+        // Ensure booking can be modified
+        if (!$booking->canBeModified()) {
+            return back()->withErrors(['error' => 'This booking can no longer be modified.']);
+        }
+
+        $request->validate([
+            'vehicle_id' => 'required|exists:vehicles,id',
+        ]);
+
+        // Verify vehicle belongs to user
+        $vehicle = Auth::user()->vehicles()->find($request->vehicle_id);
+        if (!$vehicle) {
+            return back()->withErrors(['vehicle_id' => 'Invalid vehicle selected.']);
+        }
+
+        $booking->update([
+            'vehicle_id' => $vehicle->id,
+        ]);
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'Vehicle updated successfully.');
     }
 
     /**
@@ -272,7 +332,13 @@ class BookingController extends Controller
      */
     public function getLevels(Zone $zone): JsonResponse
     {
-        $levels = $zone->parkingLevels()->get(['id', 'level_name', 'available_slots']);
+        $levels = $zone->parkingLevels()->with('parkingSlots')->get()->map(function ($level) {
+            return [
+                'id' => $level->id,
+                'level_name' => $level->level_name,
+                'available_slots' => $level->parkingSlots->where('status', 'available')->count(),
+            ];
+        });
 
         return response()->json([
             'success' => true,

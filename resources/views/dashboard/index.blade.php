@@ -8,9 +8,9 @@
     <span class="text-muted">Welcome back, {{ $user->name }}!</span>
 </div>
 
-{{-- Stats Cards --}}
+{{-- Stats Cards (via Web Service API) --}}
 <div class="row mb-4">
-    <div class="col-md-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card bg-success text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -28,13 +28,15 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card bg-primary text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-uppercase mb-1">Total Bookings</h6>
-                        <h3 class="mb-0">{{ $stats['total_bookings'] }}</h3>
+                        <h3 class="mb-0" id="stats-total-bookings">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        </h3>
                     </div>
                     <i class="fas fa-calendar-check fa-2x opacity-50"></i>
                 </div>
@@ -46,13 +48,15 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card bg-info text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-uppercase mb-1">Completed</h6>
-                        <h3 class="mb-0">{{ $stats['completed_bookings'] }}</h3>
+                        <h3 class="mb-0" id="stats-completed-bookings">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        </h3>
                     </div>
                     <i class="fas fa-check-circle fa-2x opacity-50"></i>
                 </div>
@@ -62,7 +66,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3 col-6 mb-3">
         <div class="card bg-secondary text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
@@ -77,6 +81,24 @@
                 <a href="{{ route('vehicles.index') }}" class="text-white text-decoration-none small">
                     <i class="fas fa-cog me-1"></i>Manage Vehicles
                 </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Detailed Booking Stats (from API via AJAX) --}}
+<div class="card mb-4" id="booking-stats-card">
+    <div class="card-header bg-white">
+        <i class="fas fa-chart-bar me-2"></i>Booking Statistics
+        <small class="text-muted">(via Web Service API)</small>
+    </div>
+    <div class="card-body">
+        <div class="row text-center" id="booking-stats-content">
+            <div class="col-12 text-center py-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 mb-0">Loading booking statistics...</p>
             </div>
         </div>
     </div>
@@ -222,3 +244,63 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+// WEB SERVICES - Consume Booking Stats API via Frontend AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    const statsContainer = document.getElementById('booking-stats-content');
+    const userId = {{ Auth::id() }};
+    const requestId = 'REQ_' + Date.now();
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    fetch(`/api/bookings/stats?user_id=${userId}&requestId=${requestId}&timestamp=${encodeURIComponent(timestamp)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'S') {
+                const stats = data.data;
+
+                // Update stats cards
+                document.getElementById('stats-total-bookings').textContent = stats.total_bookings;
+                document.getElementById('stats-completed-bookings').textContent = stats.completed_bookings;
+
+                // Update detailed stats card
+                statsContainer.innerHTML = `
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="h4 mb-0 text-primary">${stats.total_bookings}</div>
+                        <small class="text-muted">Total</small>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="h4 mb-0 text-success">${stats.confirmed_bookings}</div>
+                        <small class="text-muted">Confirmed</small>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="h4 mb-0 text-info">${stats.completed_bookings}</div>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="h4 mb-0 text-danger">${stats.cancelled_bookings}</div>
+                        <small class="text-muted">Cancelled</small>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <hr class="my-2">
+                        <span class="text-muted">Total Spent:</span>
+                        <strong class="text-success ms-2">RM ${parseFloat(stats.total_spent).toFixed(2)}</strong>
+                    </div>
+                `;
+                console.log('[API CONSUMED] Booking Stats API called successfully via frontend', { requestId });
+            } else {
+                document.getElementById('stats-total-bookings').textContent = '0';
+                document.getElementById('stats-completed-bookings').textContent = '0';
+                statsContainer.innerHTML = '<div class="col-12 text-danger">Failed to load statistics</div>';
+            }
+        })
+        .catch(error => {
+            console.error('[API CONSUMED] Failed to fetch booking stats:', error);
+            document.getElementById('stats-total-bookings').textContent = '-';
+            document.getElementById('stats-completed-bookings').textContent = '-';
+            statsContainer.innerHTML = '<div class="col-12 text-danger">Error loading statistics</div>';
+        });
+});
+</script>
+@endpush

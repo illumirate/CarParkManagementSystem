@@ -1,6 +1,6 @@
-@extends('layout') 
+@extends('layout')
 
-@section('content') 
+@section('content')
 <div class="container">
     <h1>Car Park Management System</h1>
 
@@ -10,7 +10,7 @@
     </div>
     @endif
 
-    <a href="{{ route('zones.create') }}" class="btn btn-primary mb-3">Add Zone</a>
+    <a href="{{ route('admin.zones.create') }}" class="btn btn-primary mb-3">Add Zone</a>
 
     <table class="table table-striped">
         <thead>
@@ -31,9 +31,9 @@
                 <td>{{ $zone->zone_name }}</td>
                 <td>{{ $zone->total_slots }}</td>
                 <td>{{ $zone->available_slots }}</td>
-                <td><a href="{{ route('zones.edit',$zone->id) }}" class="btn btn-warning">Edit</a></td>
+                <td><a href="{{ route('admin.zones.edit',$zone->id) }}" class="btn btn-warning">Edit</a></td>
                 <td>
-                    <form action="{{ route('zones.destroy',$zone->id) }}" method="post">
+                    <form action="{{ route('admin.zones.destroy',$zone->id) }}" method="post">
                         @csrf
                         @method('DELETE')
                         <button class="btn btn-danger" type="submit">Delete</button>

@@ -33,16 +33,24 @@ Route::middleware('guest')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
     Route::get('reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
+    // Google OAuth
+    Route::get('auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 });
+
+// ==================== EMAIL VERIFICATION (signed URL, no login required) ====================
+Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware(['signed'])
+    ->name('verification.verify');
 
 // ==================== AUTHENTICATED ROUTES ====================
 Route::middleware(['auth', 'active'])->group(function () {
     // Logout
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
-    // Email Verification
+    // Email Verification (for logged-in users)
     Route::get('email/verify', [AuthController::class, 'showVerificationNotice'])->name('verification.notice');
-    Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
     Route::post('email/resend', [AuthController::class, 'resendVerification'])->name('verification.resend');
 
     // Dashboard
@@ -66,6 +74,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('bookings/search', [BookingController::class, 'search'])->name('bookings.search');
     Route::post('bookings', [BookingController::class, 'store'])->name('bookings.store');
     Route::get('bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
+    Route::patch('bookings/{booking}/vehicle', [BookingController::class, 'updateVehicle'])->name('bookings.updateVehicle');
     Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
 
     // Credits & Payments
@@ -74,21 +83,22 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('credits/process', [PaymentController::class, 'processPayment'])->name('credits.process');
     Route::get('credits/success', [PaymentController::class, 'success'])->name('credits.success');
     Route::get('payments', [PaymentController::class, 'history'])->name('payments.history');
-    Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
 });
 
 // ==================== ADMIN ROUTES ====================
 Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    // Zone Management
     Route::resource('zones', ZoneController::class);
-});
 
-// Keep existing zone routes for backward compatibility
-Route::resource('zones', ZoneController::class);
-Route::resource('zones.floors', App\Http\Controllers\FloorController::class);
-Route::resource('zones.floors.slots', App\Http\Controllers\SlotController::class);
-Route::post('zones/{zone}/floors/{floor}/slots/generate',
-            [App\Http\Controllers\SlotController::class, 'generate'])
-            ->name('zones.floors.slots.generate');
+    // Floor Management
+    Route::resource('zones.floors', App\Http\Controllers\FloorController::class);
+
+    // Slot Management
+    Route::resource('zones.floors.slots', App\Http\Controllers\SlotController::class);
+    Route::post('zones/{zone}/floors/{floor}/slots/generate',
+                [App\Http\Controllers\SlotController::class, 'generate'])
+                ->name('zones.floors.slots.generate');
+});
 
 // ==================== API ROUTES (for AJAX) ====================
 Route::middleware(['auth'])->prefix('api')->group(function () {
@@ -96,5 +106,3 @@ Route::middleware(['auth'])->prefix('api')->group(function () {
     Route::get('slots/availability', [BookingController::class, 'getSlotAvailability'])->name('api.slots.availability');
 });
 
-// ==================== WEBHOOK ROUTES ====================
-Route::post('webhook/stripe', [PaymentController::class, 'handleWebhook'])->name('webhook.stripe');

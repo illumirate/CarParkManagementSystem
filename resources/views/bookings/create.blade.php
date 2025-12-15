@@ -40,7 +40,7 @@
                         <div class="col-md-4">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="date" name="date"
-                                   min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d', strtotime('+7 days')) }}" required>
+                                   min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d', strtotime('+6 days')) }}" required>
                         </div>
                         <div class="col-md-4">
                             <label for="start_time" class="form-label">Start Time <span class="text-danger">*</span></label>
@@ -111,14 +111,14 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="vehicle_id" class="form-label">Select Vehicle <span class="text-danger">*</span></label>
+                        <label for="vehicle_id" class="form-label">
+                            Select Vehicle <span class="text-danger">*</span>
+                            <small class="text-muted">(via Web Service API)</small>
+                        </label>
                         <select class="form-select" name="vehicle_id" id="vehicle_id" required>
-                            @foreach($vehicles as $vehicle)
-                            <option value="{{ $vehicle->id }}" {{ $vehicle->is_primary ? 'selected' : '' }}>
-                                {{ $vehicle->plate_number }} ({{ ucfirst($vehicle->vehicle_type) }})
-                            </option>
-                            @endforeach
+                            <option value="">Loading vehicles...</option>
                         </select>
+                        <div id="vehicles-api-status" class="form-text text-muted"></div>
                     </div>
 
                     <hr>
@@ -189,6 +189,78 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingSpinner = document.getElementById('loadingSpinner');
     const slotsContainer = document.getElementById('slotsContainer');
     const bookingSummary = document.getElementById('bookingSummary');
+    const dateInput = document.getElementById('date');
+    const startTimeInput = document.getElementById('start_time');
+    const endTimeInput = document.getElementById('end_time');
+
+    // WEB SERVICES - Consume Vehicles API from Auth Module via Frontend AJAX
+    const vehicleSelect = document.getElementById('vehicle_id');
+    const vehiclesApiStatus = document.getElementById('vehicles-api-status');
+    const userId = {{ Auth::id() }};
+    const requestId = 'REQ_' + Date.now();
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    fetch(`/api/users/${userId}/vehicles?requestId=${requestId}&timestamp=${encodeURIComponent(timestamp)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'S' && data.data.length > 0) {
+                vehicleSelect.innerHTML = '';
+                data.data.forEach(vehicle => {
+                    const option = document.createElement('option');
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.plate_number} (${vehicle.vehicle_type.charAt(0).toUpperCase() + vehicle.vehicle_type.slice(1)})`;
+                    if (vehicle.is_primary) option.selected = true;
+                    vehicleSelect.appendChild(option);
+                });
+                vehiclesApiStatus.innerHTML = '<i class="fas fa-check-circle text-success"></i> Loaded via API';
+                console.log('[API CONSUMED] Vehicles API called successfully via frontend', { requestId, count: data.count });
+            } else {
+                vehicleSelect.innerHTML = '<option value="">No vehicles found</option>';
+                vehiclesApiStatus.innerHTML = '<i class="fas fa-exclamation-circle text-warning"></i> No vehicles available';
+            }
+        })
+        .catch(error => {
+            console.error('[API CONSUMED] Failed to fetch vehicles:', error);
+            vehicleSelect.innerHTML = '<option value="">Error loading vehicles</option>';
+            vehiclesApiStatus.innerHTML = '<i class="fas fa-times-circle text-danger"></i> API error';
+        });
+
+    // Function to update minimum start time based on selected date
+    function updateMinStartTime() {
+        const selectedDate = dateInput.value;
+        const today = new Date().toISOString().split('T')[0];
+
+        if (selectedDate === today) {
+            // If today is selected, minimum start time should be current time (rounded up to next 15 min)
+            const now = new Date();
+            const minutes = Math.ceil(now.getMinutes() / 15) * 15;
+            now.setMinutes(minutes);
+            now.setSeconds(0);
+
+            let hours = now.getHours().toString().padStart(2, '0');
+            let mins = now.getMinutes().toString().padStart(2, '0');
+
+            // Ensure minimum is at least 06:00
+            const minTime = hours + ':' + mins;
+            startTimeInput.min = minTime > '06:00' ? minTime : '06:00';
+
+            // If current start time is less than minimum, clear it
+            if (startTimeInput.value && startTimeInput.value < startTimeInput.min) {
+                startTimeInput.value = '';
+            }
+        } else {
+            // For future dates, reset to default minimum
+            startTimeInput.min = '06:00';
+        }
+    }
+
+    // Update minimum time on date change
+    dateInput.addEventListener('change', updateMinStartTime);
+
+    // Also update on page load if date is already set
+    if (dateInput.value) {
+        updateMinStartTime();
+    }
 
     // Load levels when zone changes
     zoneSelect.addEventListener('change', function() {
@@ -260,10 +332,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const col = document.createElement('div');
             col.className = 'col-md-4 col-6 mb-3';
             col.innerHTML = `
-                <div class="card slot-card h-100" data-slot-id="${slot.id}" data-slot-number="${slot.slot_number}" data-zone="${slot.zone.zone_name}" style="cursor: pointer;">
+                <div class="card slot-card h-100" data-slot-id="${slot.id}" data-slot-label="${slot.slot_id}" data-zone="${slot.zone.zone_name}" style="cursor: pointer;">
                     <div class="card-body text-center">
                         <i class="fas fa-parking fa-2x text-success mb-2"></i>
-                        <h6 class="mb-1">${slot.slot_number}</h6>
+                        <h6 class="mb-1">${slot.slot_id}</h6>
                         <small class="text-muted">${slot.parking_level ? slot.parking_level.level_name : 'Ground'}</small>
                     </div>
                 </div>
@@ -276,30 +348,51 @@ document.addEventListener('DOMContentLoaded', function() {
             card.addEventListener('click', function() {
                 document.querySelectorAll('.slot-card').forEach(c => c.classList.remove('border-primary', 'bg-light'));
                 this.classList.add('border-primary', 'bg-light');
-                selectSlot(this.dataset.slotId, this.dataset.slotNumber, this.dataset.zone, feeFormatted);
+                selectSlot(this.dataset.slotId, this.dataset.slotLabel, this.dataset.zone, feeFormatted);
             });
         });
     }
 
-    function selectSlot(slotId, slotNumber, zoneName, feeFormatted) {
+    function selectSlot(slotId, slotLabel, zoneName, feeFormatted) {
         document.getElementById('selected_slot_id').value = slotId;
         document.getElementById('booking_date').value = document.getElementById('date').value;
         document.getElementById('booking_start_time').value = document.getElementById('start_time').value;
         document.getElementById('booking_end_time').value = document.getElementById('end_time').value;
 
-        document.getElementById('summary_slot').textContent = `${slotNumber} - ${zoneName}`;
+        document.getElementById('summary_slot').textContent = `${slotLabel} - ${zoneName}`;
 
         const date = new Date(document.getElementById('date').value);
         const dateStr = date.toLocaleDateString('en-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const startTime = document.getElementById('start_time').value;
         const endTime = document.getElementById('end_time').value;
-        document.getElementById('summary_datetime').textContent = `${dateStr}, ${startTime} - ${endTime}`;
+
+        // Convert to 12-hour format
+        function formatTime12h(time24) {
+            const [hours, minutes] = time24.split(':');
+            const h = parseInt(hours);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const h12 = h % 12 || 12;
+            return `${h12}:${minutes} ${ampm}`;
+        }
+
+        document.getElementById('summary_datetime').textContent = `${dateStr}, ${formatTime12h(startTime)} - ${formatTime12h(endTime)}`;
 
         // Calculate duration
         const start = new Date(`2000-01-01 ${startTime}`);
         const end = new Date(`2000-01-01 ${endTime}`);
-        const hours = (end - start) / (1000 * 60 * 60);
-        document.getElementById('summary_duration').textContent = `${hours} hour(s)`;
+        const totalMinutes = (end - start) / (1000 * 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = Math.round(totalMinutes % 60);
+
+        let durationStr = '';
+        if (hours > 0) {
+            durationStr += `${hours} hour${hours !== 1 ? 's' : ''}`;
+        }
+        if (minutes > 0) {
+            if (hours > 0) durationStr += ' ';
+            durationStr += `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+        }
+        document.getElementById('summary_duration').textContent = durationStr;
 
         document.getElementById('summary_fee').textContent = feeFormatted;
 

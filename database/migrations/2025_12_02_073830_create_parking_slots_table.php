@@ -12,11 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('parking_slots', function (Blueprint $table) {
-            $table->id(); 
+            $table->id();
             $table->string('slot_id');
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');
             $table->foreignId('level_id')->nullable()->constrained('parking_levels')->onDelete('set null');
-            $table->string('slot_number');
             $table->string('status');
             $table->timestamps();
         });

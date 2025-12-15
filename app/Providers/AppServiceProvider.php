@@ -2,21 +2,18 @@
 
 namespace App\Providers;
 
+use App\Adapters\StripePaymentAdapter;
+use App\Contracts\PaymentGatewayInterface;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
+        // ADAPTER PATTERN: Bind the Target interface to the Adapter
+        $this->app->bind(PaymentGatewayInterface::class, StripePaymentAdapter::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         //
