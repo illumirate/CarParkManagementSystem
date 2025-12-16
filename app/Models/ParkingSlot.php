@@ -14,8 +14,6 @@ class ParkingSlot extends Model
         'status',
     ];
 
-    // ==================== RELATIONSHIPS ====================
-
     public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);

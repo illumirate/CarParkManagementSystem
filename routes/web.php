@@ -7,6 +7,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\ZoneController;
+use App\Http\Controllers\SlotController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -95,9 +96,34 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
 
     // Slot Management
     Route::resource('zones.floors.slots', App\Http\Controllers\SlotController::class);
-    Route::post('zones/{zone}/floors/{floor}/slots/generate',
-                [App\Http\Controllers\SlotController::class, 'generate'])
-                ->name('zones.floors.slots.generate');
+    Route::post(
+        'zones/{zone}/floors/{floor}/slots/generate',
+        [App\Http\Controllers\SlotController::class, 'generate']
+    )
+        ->name('zones.floors.slots.generate');
+
+    Route::post(
+        'zones/{zone}/floors/{floor}/slots/bulk-mark-unavail',
+        [SlotController::class, 'bulkMarkUnavailable']
+    )->name('zones.floors.slots.bulkMarkUnavailable');
+
+    Route::post(
+        'zones/{zone}/floors/{floor}/slots/bulk-mark-avail',
+        [SlotController::class, 'bulkMarkAvailable']
+    )->name('zones.floors.slots.bulkMarkAvailable');
+
+    Route::post('zones/{zone}/floors/{floor}/slots/{slot}/update-type', [SlotController::class, 'updateType'])
+        ->name('zones.floors.slots.updateType');
+
+    Route::post(
+        'zones/{zone}/floors/{floor}/slots/{slot}/maintenance',
+        [SlotController::class, 'scheduleMaintenance']
+    )->name('zones.floors.slots.scheduleMaintenance');
+
+    Route::get('zones/{zone}/floors/{floor}/slots/{slot}/maintenance', [SlotController::class, 'showMaintenanceForm'])
+        ->name('zones.floors.slots.scheduleMaintenanceForm');
+
+
 });
 
 // ==================== API ROUTES (for AJAX) ====================

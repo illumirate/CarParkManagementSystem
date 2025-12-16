@@ -15,8 +15,6 @@ class ParkingLevel extends Model
         'available_slots',
     ];
 
-    // ==================== RELATIONSHIPS ====================
-
     public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);

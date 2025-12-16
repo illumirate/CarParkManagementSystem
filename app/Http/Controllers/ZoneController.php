@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Zone;
 use App\Models\ParkingLevel;
 use Illuminate\Http\Request;
+use Database\Factories\Zone\ZoneFactory;
 
 class ZoneController extends Controller
 {
@@ -38,48 +39,22 @@ class ZoneController extends Controller
 
         if ($request->type === 'single') {
             $request->validate([
-                'total_slots' => 'required|integer|min:1'
+                'total_slots' => 'required|integer|min:1',
             ]);
-
-            $zone = Zone::create([
-                'zone_code' => $request->zone_code,
-                'zone_name' => $request->zone_name,
-                'type' => 'single',
-                'total_slots' => $request->total_slots,
-                'available_slots' => $request->total_slots,
-            ]);
-
-            return redirect()->route('admin.zones.index')->with('success', 'Zone Added Sucessfully.');
-        }
-
-        $request->validate([
-            'floors' => 'required|array|min:1',
-            'floors.*.name' => 'required|string',
-            'floors.*.slots' => 'required|integer|min:1',
-        ]);
-
-        $total = collect($request->floors)->sum('slots');
-
-        $zone = Zone::create([
-            'zone_code' => $request->zone_code,
-            'zone_name' => $request->zone_name,
-            'type' => 'multi',
-            'total_slots' => $total,
-            'available_slots' => $total,
-        ]);
-
-        foreach ($request->floors as $floor) {
-            ParkingLevel::create([
-                'zone_id' => $zone->id,
-                'level_name' => $floor['name'],
-                'total_slots' => $floor['slots'],
-                'available_slots' => $floor['slots'],
+        } else {
+            $request->validate([
+                'floors' => 'required|array|min:1',
+                'floors.*.name' => 'required|string',
+                'floors.*.slots' => 'required|integer|min:1',
             ]);
         }
 
-        return redirect()->route('admin.zones.index')->with('success', 'Zone Added Sucessfully.');
+        ZoneFactory::make($request->type)->create($request);
+
+        return redirect()
+            ->route('admin.zones.index')
+            ->with('success', 'Zone Added Successfully.');
     }
-
 
     /**
      * Display the specified resource.

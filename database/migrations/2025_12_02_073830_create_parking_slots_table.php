@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('slot_id');
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');
             $table->foreignId('level_id')->nullable()->constrained('parking_levels')->onDelete('set null');
+            $table->string('type')->default('regular'); 
             $table->string('status');
             $table->timestamps();
         });

@@ -15,8 +15,6 @@ class Zone extends Model
         'available_slots',
     ];
 
-    // ==================== RELATIONSHIPS ====================
-
     public function parkingLevels(): HasMany
     {
         return $this->hasMany(ParkingLevel::class);

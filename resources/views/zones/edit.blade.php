@@ -39,8 +39,9 @@
 
             <div id="single_fields" style="display: {{ $zone->type == 'single' ? 'block' : 'none' }}">
                 <p>
-                    <label for="total_slots">Total Slots:</label>
-                    <input type="number" name="total_slots" value="{{ old('total_slots', $zone->total_slots) }}">
+                    <a href="{{ route('admin.zones.floors.index', $zone->id) }}" class="btn btn-info mb-3">
+                        Floor Management
+                    </a>
                 </p>
             </div>
 
