@@ -23,5 +23,12 @@ class ParkingSlot extends Model
     {
         return $this->belongsTo(ParkingLevel::class, 'level_id');
     }
+
+    public function maintenance()
+    {
+        return $this->hasOne(SlotMaintenance::class, 'slot_id')
+            ->where('end_time', '>=', now());
+    }
+
 }
 

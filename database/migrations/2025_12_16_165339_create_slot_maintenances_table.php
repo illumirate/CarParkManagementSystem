@@ -13,8 +13,8 @@ return new class extends Migration {
         Schema::create('slot_maintenances', function (Blueprint $table) {
             $table->id();
             $table->foreignId('slot_id')->constrained('parking_slots')->onDelete('cascade');
-            $table->timestamp('start_time');
-            $table->timestamp('end_time')->nullable();
+            $table->timestamp('start_time')->useCurrent();
+            $table->timestamp('end_time')->default(DB::raw('DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 YEAR)'));
             $table->timestamps();
         });
     }

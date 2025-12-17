@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 use App\Models\Zone;
 use App\Models\ParkingLevel;
 use Database\Factories\Slot\SlotFactory;
+use App\Jobs\SetSlotAvailable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class SlotController extends Controller
 {
@@ -81,7 +85,7 @@ class SlotController extends Controller
         }
     }
 
-    public function generate($zoneId, $floorId, $slotType = 'regular')
+    public function generate($zoneId, $floorId, $slotType = 'Car')
     {
         $zone = Zone::findOrFail($zoneId);
         $floor = ParkingLevel::findOrFail($floorId);
@@ -139,18 +143,13 @@ class SlotController extends Controller
     public function updateType(Request $request, $zoneId, $floorId, $slotId)
     {
         $request->validate([
-            'type' => 'required|in:Regular,Staff,VIP',
+            'type' => 'required|in:Car,Motorcycle',
         ]);
 
         $slot = ParkingSlot::findOrFail($slotId);
 
         $slot->type = $request->type;
 
-        if (in_array($request->type, ['VIP'])) {
-            $slot->status = 'reserved';
-        } else {
-            $slot->status = 'available';
-        }
 
         $slot->save();
 
@@ -169,29 +168,102 @@ class SlotController extends Controller
         ]);
 
         $slot = ParkingSlot::findOrFail($slotId);
+        $requestId = Str::uuid();
+        $timestamp = now()->format('Y-m-d H:i:s');
 
+        $token = $request->bearerToken();
+        $authResponse = Http::withToken($token)->get('http://127.0.0.1:8001/api/verify-token');
+        $user = $authResponse->successful() ? $authResponse->json() : null;
+
+
+        if (!$user || !in_array($user['role'], ['admin', 'maintenance'])) {
+            return redirect()->back()->with('error', 'Unauthorized or forbidden.');
+        }
+
+        $bookingResponse = Http::get('http://booking-module/api/bookings', [
+            'requestId' => $requestId,
+            'timestamp' => $timestamp,
+            'slot_id' => $slotId
+        ]);
+
+        $bookings = $bookingResponse->successful() ? collect($bookingResponse->json()['data']) : collect();
+        $activeBookings = $bookings->filter(fn($b) => in_array($b['status'], ['confirmed', 'ongoing']));
+
+        if ($activeBookings->isNotEmpty()) {
+            foreach ($activeBookings as $booking) {
+                Http::post('http://payment-module/api/payments/refund', [
+                    'requestId' => $requestId,
+                    'timestamp' => $timestamp,
+                    'slot_id' => $slotId,
+                    'booking_id' => $booking['booking_id'],
+                    'amount' => $booking['total_fee']
+                ]);
+            }
+
+            return redirect()->back()->with('error', 'Slot has active bookings. Maintenance cannot proceed.');
+        }
+
+        $slot->update(['status' => 'maintenance']);
         SlotMaintenance::create([
             'slot_id' => $slot->id,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
         ]);
 
-        if (now()->between($request->start_time, $request->end_time)) {
-            $slot->update(['status' => 'unavailable']);
-        }
+        $end = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i', $request->end_time, 'Asia/Kuala_Lumpur');
+        $delay = max(0, now()->diffInSeconds($end));
+        SetSlotAvailable::dispatch($slot->id)->delay($delay);
 
         return redirect()->back()->with('success', 'Slot scheduled for maintenance.');
     }
 
-    public function showMaintenanceForm($zoneId, $floorId, $slotId)
+    public function updateMaintenance(Request $request, $zoneId, $floorId, $slotId)
     {
+        $request->validate([
+            'end_time' => 'required|date|after:start_time',
+        ]);
 
         $slot = ParkingSlot::findOrFail($slotId);
+        $maintenance = $slot->maintenance;
+
+        if (!$maintenance) {
+            return redirect()->back()->with('error', 'No maintenance record found for this slot.');
+        }
+
+        $maintenance->update([
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+        ]);
+
+        if (now()->between($request->start_time, $request->end_time)) {
+            $slot->update(['status' => 'maintenance']);
+        }
+
+        return redirect()->back()->with('success', 'Maintenance updated successfully.');
+    }
+
+    public function completeMaintenance($zoneId, $floorId, $slotId)
+    {
+        $slot = ParkingSlot::findOrFail($slotId);
+        $maintenance = $slot->maintenance;
+
+        if ($maintenance) {
+            $maintenance->end_time = now();
+            $maintenance->save();
+        }
+        $slot->update(['status' => 'available']);
+
+        return redirect()->back()->with('success', 'Maintenance marked as complete.');
+    }
+
+    public function showMaintenanceForm($zoneId, $floorId, $slotId)
+    {
+        $slot = ParkingSlot::with('maintenance')->findOrFail($slotId);
         $floor = $slot->parkingLevel;
         $zone = $slot->zone;
-        $slots = ParkingSlot::where('level_id', $floor->id)->get();
 
+        return view('parkingslots.maintenance', compact('slot', 'floor', 'zone'));
 
-        return view('parkingslots.maintenance', compact('zone', 'floor', 'slot', 'slots'));
     }
+
 }

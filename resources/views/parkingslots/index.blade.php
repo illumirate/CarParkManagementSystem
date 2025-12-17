@@ -56,9 +56,9 @@
                             <td>
                                 <select
                                     onchange="updateSlotType({{ $slot->id }}, {{ $zone->id }}, {{ $floor->id }}, this.value)">
-                                    <option value="Regular" {{ $slot->type == 'Regular' ? 'selected' : '' }}>Regular
+                                    <option value="Car" {{ $slot->type == 'Car' ? 'selected' : '' }}>Car
                                     </option>
-                                    <option value="VIP" {{ $slot->type == 'VIP' ? 'selected' : '' }}>VIP</option>
+                                    <option value="Motorcycle" {{ $slot->type == 'Motorcycle' ? 'selected' : '' }}>Motorcycle</option>
                                 </select>
 
                             </td>

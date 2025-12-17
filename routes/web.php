@@ -120,6 +120,13 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
         [SlotController::class, 'scheduleMaintenance']
     )->name('zones.floors.slots.scheduleMaintenance');
 
+    Route::put('zones/{zone}/floors/{floor}/slots/{slot}/update-maintenance', [SlotController::class, 'updateMaintenance'])
+        ->name('zones.floors.slots.updateMaintenance');
+
+    Route::put('zones/{zone}/floors/{floor}/slots/{slot}/complete-maintenance', [SlotController::class, 'completeMaintenance'])
+        ->name('zones.floors.slots.completeMaintenance');
+
+
     Route::get('zones/{zone}/floors/{floor}/slots/{slot}/maintenance', [SlotController::class, 'showMaintenanceForm'])
         ->name('zones.floors.slots.scheduleMaintenanceForm');
 
