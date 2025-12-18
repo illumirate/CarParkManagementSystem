@@ -214,6 +214,9 @@ class BookingController extends Controller
                 'confirmed_at' => now(),
             ]);
 
+            // Update slot status
+            $slot->update(['status' => 'booked']);
+
             // Send booking confirmation email
             $user->notify(new BookingConfirmation($booking));
 

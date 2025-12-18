@@ -7,19 +7,19 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
 
 class AdminMiddleware
 {
-    /**
-     * Handle an incoming request.
-     * Only allow users with 'admin' role.
-     */
     public function handle(Request $request, Closure $next): Response
     {
-        /** @var User|null $user */
         $user = Auth::user();
 
         if (!Auth::check() || !$user || !$user->isAdmin()) {
+            $userId = $user?->id ?? 'guest';
+            $userName = $user?->name ?? 'guest';
+            Log::warning("Unauthorized access attempt by user {$userName} (ID: {$userId}) to {$request->method()} {$request->fullUrl()}");
+
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Unauthorized. Admin access required.'], 403);
             }
