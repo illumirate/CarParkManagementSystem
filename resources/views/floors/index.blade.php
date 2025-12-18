@@ -10,7 +10,10 @@
             </div>
         @endif
 
-        <a href="{{ route('admin.zones.floors.create', $zone->id) }}" class="btn btn-primary mb-3">Add Floor</a>
+        {{-- Only show Add Floor button for multi-level zones --}}
+        @if($zone->type === 'multi')
+            <a href="{{ route('admin.zones.floors.create', $zone->id) }}" class="btn btn-primary mb-3">Add Floor</a>
+        @endif
 
         <a href="{{ route('admin.zones.index') }}" class="btn btn-secondary mb-3">Back to Zones</a>
 
@@ -36,7 +39,6 @@
                             <a href="{{ route('admin.zones.floors.slots.index', [$zone->id, $floor->id]) }}"
                                 class="btn btn-warning">Manage Slots</a>
                         </td>
-
 
                         <td>
                             <form action="{{ route('admin.zones.floors.destroy', [$zone->id, $floor->id]) }}" method="post">

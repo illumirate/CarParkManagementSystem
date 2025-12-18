@@ -98,10 +98,30 @@ class FloorController extends Controller
      */
     public function destroy($zoneId, $floorId)
     {
-        $floor = ParkingLevel::findOrFail($floorId);
+        $floor = ParkingLevel::with('parkingSlots.bookings')->findOrFail($floorId);
+
+        $blockedSlots = [];
+        foreach ($floor->parkingSlots as $slot) {
+            $activeBookings = $slot->bookings()
+                ->whereIn('status', ['pending', 'confirmed', 'active'])
+                ->where('booking_date', '>=', now()->toDateString())
+                ->count();
+
+            if ($activeBookings > 0) {
+                $blockedSlots[] = $slot->slot_id;
+            }
+        }
+
+        if (!empty($blockedSlots)) {
+            return redirect()->route('admin.zones.floors.index', $zoneId)
+                ->with('error', 'Cannot delete floor. Slots with active bookings: ' . implode(', ', $blockedSlots));
+        }
+
         $floor->delete();
 
-        return redirect()->route('admin.zones.floors.index', $zoneId)->with('success', 'Floor deleted.');
+        return redirect()->route('admin.zones.floors.index', $zoneId)
+            ->with('success', 'Floor deleted successfully.');
     }
+
 
 }

@@ -29,6 +29,9 @@ class ParkingSlot extends Model
         return $this->hasOne(SlotMaintenance::class, 'slot_id')
             ->where('end_time', '>=', now());
     }
-
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'parking_slot_id');
+    }
 }
 

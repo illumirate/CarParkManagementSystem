@@ -12,11 +12,25 @@ class ZoneController extends Controller
     /**
      * Display a listing of the resource.
      */
+    // App\Http\Controllers\Admin\ZoneController.php
     public function index()
     {
-        $zones = Zone::all();
+        $zones = Zone::with('parkingLevels')->get()->map(function ($zone) {
+            \Log::info($zone->toArray());
+
+            if ($zone->type === 'multi') {
+                $zone->calculated_available_slots = $zone->parkingLevels->sum(fn($level) => $level->available_slots ?? 0);
+            } else {
+                $zone->calculated_available_slots = $zone->available_slots ?? 0;
+            }
+
+            return $zone;
+        });
+
         return view('zones.index', compact('zones'));
     }
+
+
 
     /**
      * Show the form for creating a new resource.
@@ -158,7 +172,20 @@ class ZoneController extends Controller
      */
     public function destroy($id)
     {
-        Zone::findOrFail($id)->delete();
+        $zone = Zone::with('parkingLevels.parkingSlots.bookings')->findOrFail($id);
+
+        $hasActiveBookings = $zone->parkingLevels
+            ->flatMap(fn($level) => $level->parkingSlots)
+            ->flatMap(fn($slot) => $slot->bookings)
+            ->contains(fn($booking) => in_array($booking->status, ['pending', 'confirmed', 'active']));
+
+        if ($hasActiveBookings) {
+            return redirect()->route('admin.zones.index')
+                ->with('error', 'Cannot delete zone. Some slots have active bookings.');
+        }
+
+        $zone->delete();
+
         return redirect()->route('admin.zones.index')->with('success', 'Zone successfully deleted.');
     }
 }

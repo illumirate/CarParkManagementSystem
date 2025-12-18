@@ -15,10 +15,11 @@ class Zone extends Model
         'available_slots',
     ];
 
-    public function parkingLevels(): HasMany
+    public function parkingLevels()
     {
-        return $this->hasMany(ParkingLevel::class);
+        return $this->hasMany(ParkingLevel::class, 'zone_id');
     }
+
 
     public function parkingSlots(): HasMany
     {

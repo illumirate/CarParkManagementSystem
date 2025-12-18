@@ -113,7 +113,6 @@ class SlotController extends Controller
     public function bulkMarkUnavailable(Request $request, $zoneId, $floorId)
     {
         $slotIds = $request->input('slot_ids', []);
-
         if (empty($slotIds)) {
             return redirect()->back()->with('error', 'No slots selected.');
         }
@@ -122,12 +121,11 @@ class SlotController extends Controller
         $updatedCount = 0;
 
         foreach ($slotIds as $slotId) {
-            $slot = ParkingSlot::find($slotId);
+            $slot = ParkingSlot::with('parkingLevel.zone')->find($slotId);
             if (!$slot)
                 continue;
 
             $activeBookings = BookingService::getActiveBookingsForSlot($slotId);
-
             if (!empty($activeBookings['data'])) {
                 $blockedSlots[] = $slot->slot_id;
                 continue;
@@ -135,6 +133,20 @@ class SlotController extends Controller
 
             $slot->update(['status' => 'unavailable']);
             $updatedCount++;
+
+            $level = $slot->parkingLevel;
+            if ($level) {
+                $level->available_slots = $level->parkingSlots()->where('status', 'available')->count();
+                $level->save();
+
+                $zone = $level->zone;
+                if ($zone) {
+                    $zone->available_slots = $zone->type === 'multi'
+                        ? $zone->parkingLevels()->sum('available_slots')
+                        : $level->available_slots;
+                    $zone->save();
+                }
+            }
         }
 
         $message = "{$updatedCount} slots marked as unavailable.";
@@ -146,11 +158,9 @@ class SlotController extends Controller
             ->with('success', $message);
     }
 
-
     public function bulkMarkAvailable(Request $request, $zoneId, $floorId)
     {
         $slotIds = $request->input('slot_ids', []);
-
         if (empty($slotIds)) {
             return redirect()->back()->with('error', 'No slots selected.');
         }
@@ -159,12 +169,11 @@ class SlotController extends Controller
         $updatedCount = 0;
 
         foreach ($slotIds as $slotId) {
-            $slot = ParkingSlot::find($slotId);
+            $slot = ParkingSlot::with('parkingLevel.zone')->find($slotId);
             if (!$slot)
                 continue;
 
             $activeBookings = BookingService::getActiveBookingsForSlot($slotId);
-
             if (!empty($activeBookings['data']) || $slot->status === 'maintenance') {
                 $blockedSlots[] = $slot->slot_id;
                 continue;
@@ -172,6 +181,20 @@ class SlotController extends Controller
 
             $slot->update(['status' => 'available']);
             $updatedCount++;
+
+            $level = $slot->parkingLevel;
+            if ($level) {
+                $level->available_slots = $level->parkingSlots()->where('status', 'available')->count();
+                $level->save();
+
+                $zone = $level->zone;
+                if ($zone) {
+                    $zone->available_slots = $zone->type === 'multi'
+                        ? $zone->parkingLevels()->sum('available_slots')
+                        : $level->available_slots;
+                    $zone->save();
+                }
+            }
         }
 
         $message = "{$updatedCount} slots marked as available.";
@@ -182,6 +205,7 @@ class SlotController extends Controller
         return redirect()->route('admin.zones.floors.slots.index', [$zoneId, $floorId])
             ->with('success', $message);
     }
+
 
 
     public function updateType(Request $request, $zoneId, $floorId, $slotId)
@@ -215,7 +239,7 @@ class SlotController extends Controller
         }
 
         try {
-            $slot = ParkingSlot::findOrFail($slotId);
+            $slot = ParkingSlot::with('parkingLevel.zone')->findOrFail($slotId);
 
             $request->validate([
                 'start_time' => 'required|date|after_or_equal:now',
@@ -226,8 +250,6 @@ class SlotController extends Controller
             $endTime = Carbon::parse($request->end_time);
 
             $activeBookings = BookingService::getActiveBookingsForSlot($slotId);
-
-            Log::info("User {$user->name} ({$user->id}) attempting to schedule maintenance for slot {$slotId} from {$startTime} to {$endTime}");
 
             if ($activeBookings === null) {
                 Log::error("Booking service failure for slot {$slotId} by user {$user->id}");
@@ -252,8 +274,22 @@ class SlotController extends Controller
                 'end_time' => $endTime,
             ]);
 
-            Log::info("Maintenance scheduled successfully for slot {$slotId} by user {$user->id}");
+            // Update counts for level and zone
+            $level = $slot->parkingLevel;
+            if ($level) {
+                $level->available_slots = $level->parkingSlots()->where('status', 'available')->count();
+                $level->save();
 
+                $zone = $level->zone;
+                if ($zone) {
+                    $zone->available_slots = $zone->type === 'multi'
+                        ? $zone->parkingLevels()->sum('available_slots')
+                        : $level->available_slots;
+                    $zone->save();
+                }
+            }
+
+            Log::info("Maintenance scheduled successfully for slot {$slotId} by user {$user->id}");
             SetSlotAvailable::dispatch($slot->id)->delay($endTime);
 
             return redirect()->back()->with('success', 'Slot scheduled for maintenance successfully.');
@@ -324,7 +360,7 @@ class SlotController extends Controller
         }
 
         try {
-            $slot = ParkingSlot::findOrFail($slotId);
+            $slot = ParkingSlot::with('parkingLevel.zone')->findOrFail($slotId);
             $maintenance = $slot->maintenance;
 
             if ($maintenance) {
@@ -333,7 +369,23 @@ class SlotController extends Controller
                 Log::info("Maintenance completed for slot {$slot->slot_id} by user {$user->id}");
             }
 
+            // Mark slot as available
             $slot->update(['status' => 'available']);
+
+            // Update counts for level and zone
+            $level = $slot->parkingLevel;
+            if ($level) {
+                $level->available_slots = $level->parkingSlots()->where('status', 'available')->count();
+                $level->save();
+
+                $zone = $level->zone;
+                if ($zone) {
+                    $zone->available_slots = $zone->type === 'multi'
+                        ? $zone->parkingLevels()->sum('available_slots')
+                        : $level->available_slots;
+                    $zone->save();
+                }
+            }
 
             return redirect()->back()->with('success', 'Maintenance marked as complete.');
         } catch (\Exception $e) {
