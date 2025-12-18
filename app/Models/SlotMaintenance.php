@@ -16,4 +16,9 @@ class SlotMaintenance extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
     ];
+
+    public function slot()
+    {
+        return $this->belongsTo(ParkingSlot::class);
+    }
 }

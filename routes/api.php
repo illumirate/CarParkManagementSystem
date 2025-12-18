@@ -28,3 +28,4 @@ Route::get('/users/{id}/vehicles', [AuthApiController::class, 'getVehicles']);
 // ==================== SLOT MANAGEMENT MODULE APIs ====================
 // Exposed: For booking module to consume slot data (simulating other team member's API)
 Route::get('/slots', [SlotApiController::class, 'getSlots']);
+Route::get('/zones', [SlotApiController::class, 'getZones']);
