@@ -1,5 +1,7 @@
 <?php
-
+  /**
+  * Author: Adam Chin Wai Kin
+  */
 namespace App\Http\Controllers;
 
 use App\Models\Zone;
@@ -12,7 +14,6 @@ class ZoneController extends Controller
     /**
      * Display a listing of the resource.
      */
-    // App\Http\Controllers\Admin\ZoneController.php
     public function index()
     {
         $zones = Zone::with('parkingLevels')->get()->map(function ($zone) {

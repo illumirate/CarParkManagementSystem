@@ -1,3 +1,4 @@
+{{-- Author: Adam Chin Wai Kin --}}
 @extends('layout')
 @section('content')
 

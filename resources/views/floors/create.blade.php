@@ -1,4 +1,4 @@
-@extends('layout')
+{{-- Author: Adam Chin Wai Kin --}}@extends('layout')
 @section('content')
     @if ($errors->any())
         <div class="alert alert-danger">

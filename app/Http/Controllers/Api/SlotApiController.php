@@ -1,5 +1,7 @@
 <?php
-
+  /**
+  * Author: Adam Chin Wai Kin
+  */
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
