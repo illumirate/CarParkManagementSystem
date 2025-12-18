@@ -144,4 +144,53 @@ class BookingApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * EXPOSED API: Get active/future bookings for a slot
+     * Endpoint: GET /api/bookings/slot/{slotId}/active
+     * Target Modules: Slot Management
+     */
+    public function getActiveBookingsForSlot(Request $request, $slotId): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'requestId' => 'required|string',
+            'timestamp' => 'required|date_format:Y-m-d H:i:s',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'F',
+                'message' => 'Missing mandatory fields: requestId and timestamp',
+                'errors' => $validator->errors(),
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+            ], 400);
+        }
+
+        $today = now()->toDateString();
+        $bookings = Booking::with(['user:id,name,email', 'vehicle:id,plate_number'])
+            ->where('parking_slot_id', $slotId)
+            ->whereIn('status', ['pending', 'confirmed', 'active'])
+            ->where('booking_date', '>=', $today)
+            ->orderBy('start_time', 'asc')
+            ->get();
+
+        $data = $bookings->map(fn($b) => [
+            'booking_id' => $b->id,
+            'user_id' => $b->user_id,
+            'user_name' => $b->user->name ?? null,
+            'vehicle_plate' => $b->vehicle->plate_number ?? null,
+            'start_time' => $b->start_time,
+            'end_time' => $b->end_time,
+            'status' => $b->status,
+        ]);
+
+        return response()->json([
+            'status' => 'S',
+            'message' => 'Active bookings retrieved successfully',
+            'requestId' => $request->requestId,
+            'data' => $data,
+            'count' => $data->count(),
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+        ]);
+    }
 }

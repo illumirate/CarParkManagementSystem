@@ -11,7 +11,9 @@ use Database\Factories\Slot\SlotFactory;
 use App\Jobs\SetSlotAvailable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
+use App\Services\BookingService;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class SlotController extends Controller
 {
@@ -160,62 +162,68 @@ class SlotController extends Controller
             'new_status' => $slot->status,
         ]);
     }
+
     public function scheduleMaintenance(Request $request, $zoneId, $floorId, $slotId)
     {
-        $request->validate([
-            'start_time' => 'required|date|after_or_equal:now',
-            'end_time' => 'required|date|after:start_time',
-        ]);
+        try {
+            $slot = ParkingSlot::findOrFail($slotId);
 
-        $slot = ParkingSlot::findOrFail($slotId);
-        $requestId = Str::uuid();
-        $timestamp = now()->format('Y-m-d H:i:s');
+            $request->validate([
+                'start_time' => 'required|date|after_or_equal:now',
+                'end_time' => 'required|date|after:start_time',
+            ]);
 
-        $token = $request->bearerToken();
-        $authResponse = Http::withToken($token)->get('http://127.0.0.1:8001/api/verify-token');
-        $user = $authResponse->successful() ? $authResponse->json() : null;
+            $startTime = Carbon::parse($request->start_time);
+            $endTime = Carbon::parse($request->end_time);
 
+            $activeBookings = BookingService::getActiveBookingsForSlot($slotId);
 
-        if (!$user || !in_array($user['role'], ['admin', 'maintenance'])) {
-            return redirect()->back()->with('error', 'Unauthorized or forbidden.');
-        }
-
-        $bookingResponse = Http::get('http://booking-module/api/bookings', [
-            'requestId' => $requestId,
-            'timestamp' => $timestamp,
-            'slot_id' => $slotId
-        ]);
-
-        $bookings = $bookingResponse->successful() ? collect($bookingResponse->json()['data']) : collect();
-        $activeBookings = $bookings->filter(fn($b) => in_array($b['status'], ['confirmed', 'ongoing']));
-
-        if ($activeBookings->isNotEmpty()) {
-            foreach ($activeBookings as $booking) {
-                Http::post('http://payment-module/api/payments/refund', [
-                    'requestId' => $requestId,
-                    'timestamp' => $timestamp,
-                    'slot_id' => $slotId,
-                    'booking_id' => $booking['booking_id'],
-                    'amount' => $booking['total_fee']
-                ]);
+            if ($activeBookings === null) {
+                return redirect()->back()->with('error', 'Failed to check active bookings via Booking service.');
             }
 
-            return redirect()->back()->with('error', 'Slot has active bookings. Maintenance cannot proceed.');
+            if (!empty($activeBookings['data'])) {
+                foreach ($activeBookings['data'] as $booking) {
+                    $bookingStart = Carbon::parse($booking['start_time']);
+                    $bookingEnd = Carbon::parse($booking['end_time']);
+
+                    Log::info("Checking overlap for slot {$slotId}");
+                    Log::info("Maintenance Start: {$startTime} | End: {$endTime}");
+                    Log::info("Booking Start: {$bookingStart} | End: {$bookingEnd}");
+
+                    if ($startTime->lt($bookingEnd) && $endTime->gt($bookingStart)) {
+                        Log::warning("Overlap detected with booking {$booking['booking_id']}");
+                        return redirect()->back()->with('error', 'Maintenance time overlaps with an existing booking. Cannot schedule maintenance.');
+                    } else {
+                        Log::info("No overlap with booking {$booking['booking_id']}");
+                    }
+                }
+            }
+
+            $slot->update(['status' => 'maintenance']);
+
+            SlotMaintenance::create([
+                'slot_id' => $slot->id,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ]);
+
+            return redirect()->back()->with('success', 'Slot scheduled for maintenance successfully.');
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->back()->with('error', 'Slot not found.');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
+
+        } catch (\Exception $e) {
+            \Log::error("Error scheduling maintenance for slot {$slotId}: {$e->getMessage()}");
+            return redirect()->back()->with('error', 'An unexpected error occurred. Please try again.');
         }
-
-        $slot->update(['status' => 'maintenance']);
-        SlotMaintenance::create([
-            'slot_id' => $slot->id,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-        ]);
-
-        $end = \Carbon\Carbon::createFromFormat('Y-m-d\TH:i', $request->end_time, 'Asia/Kuala_Lumpur');
-        $delay = max(0, now()->diffInSeconds($end));
-        SetSlotAvailable::dispatch($slot->id)->delay($delay);
-
-        return redirect()->back()->with('success', 'Slot scheduled for maintenance.');
     }
+
+
+
 
     public function updateMaintenance(Request $request, $zoneId, $floorId, $slotId)
     {
@@ -263,7 +271,5 @@ class SlotController extends Controller
         $zone = $slot->zone;
 
         return view('parkingslots.maintenance', compact('slot', 'floor', 'zone'));
-
     }
-
 }

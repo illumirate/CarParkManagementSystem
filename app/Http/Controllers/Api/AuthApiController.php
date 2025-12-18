@@ -63,7 +63,7 @@ class AuthApiController extends Controller
                     'brand' => $vehicle->brand,
                     'model' => $vehicle->model,
                     'color' => $vehicle->color,
-                    'type' => $vehicle->type,
+                    'vehicle_type' => $vehicle->vehicle_type, 
                 ];
             });
 

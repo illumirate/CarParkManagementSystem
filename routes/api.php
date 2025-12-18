@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Route;
 // Exposed: For other modules to consume booking data
 Route::get('/bookings', [BookingApiController::class, 'getBookings']);
 Route::get('/bookings/stats', [BookingApiController::class, 'getBookingStats']);
+Route::get('/slots/{slotId}/active-bookings', action: [BookingApiController::class, 'getActiveBookingsForSlot']);
 
 // ==================== AUTHENTICATION MODULE APIs ====================
 // Exposed: For other modules to get user's vehicles

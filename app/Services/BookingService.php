@@ -8,6 +8,9 @@ use App\Models\User;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class BookingService
 {
@@ -182,17 +185,35 @@ class BookingService
                 $query->where(function ($q) use ($startTime, $endTime) {
                     // New booking starts during existing booking
                     $q->where('start_time', '<=', $startTime)
-                      ->where('end_time', '>', $startTime);
+                        ->where('end_time', '>', $startTime);
                 })->orWhere(function ($q) use ($startTime, $endTime) {
                     // New booking ends during existing booking
                     $q->where('start_time', '<', $endTime)
-                      ->where('end_time', '>=', $endTime);
+                        ->where('end_time', '>=', $endTime);
                 })->orWhere(function ($q) use ($startTime, $endTime) {
                     // New booking completely contains existing booking
                     $q->where('start_time', '>=', $startTime)
-                      ->where('end_time', '<=', $endTime);
+                        ->where('end_time', '<=', $endTime);
                 });
             })
             ->exists();
+    }
+
+    public static function getActiveBookingsForSlot($slotId)
+    {
+        try {
+            $response = Http::get(config('services.booking.url') . "/api/slots/{$slotId}/active-bookings", [
+                'requestId' => (string) Str::uuid(),
+                'timestamp' => now()->format('Y-m-d H:i:s')
+            ]);
+
+            \Log::info("BookingService API response for slot {$slotId}: " . $response->body());
+
+            return $response->json();
+
+        } catch (\Exception $e) {
+            \Log::error("BookingService API call failed: " . $e->getMessage());
+            return null;
+        }
     }
 }

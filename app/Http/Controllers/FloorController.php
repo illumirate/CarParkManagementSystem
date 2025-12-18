@@ -17,10 +17,16 @@ class FloorController extends Controller
     public function index($zoneId)
     {
         $zone = Zone::findOrFail($zoneId);
-        $floors = ParkingLevel::where('zone_id', $zoneId)->get();
+        $floors = ParkingLevel::with('parkingSlots')->where('zone_id', $zoneId)->get();
+
+        $floors->each(function ($floor) {
+            $floor->available_slots = $floor->parkingSlots->where('status', 'available')->count();
+        });
+
 
         return view('floors.index', compact('zone', 'floors'));
     }
+
 
     /**
      * Show the form for creating a new resource.
