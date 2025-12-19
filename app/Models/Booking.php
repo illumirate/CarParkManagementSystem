@@ -100,8 +100,17 @@ class Booking extends Model
 
     public function scopeUpcoming($query)
     {
+        $today = now()->toDateString();
+        $currentTime = now()->format('H:i');
+
         return $query->where('status', 'confirmed')
-            ->where('booking_date', '>=', now()->toDateString());
+            ->where(function ($q) use ($today, $currentTime) {
+                $q->where('booking_date', '>', $today)
+                    ->orWhere(function ($q2) use ($today, $currentTime) {
+                        $q2->where('booking_date', '=', $today)
+                            ->where('start_time', '>=', $currentTime);
+                    });
+            });
     }
 
     public function scopePast($query)

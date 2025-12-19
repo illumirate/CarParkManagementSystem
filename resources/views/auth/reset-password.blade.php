@@ -33,7 +33,17 @@
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
                             <input type="password" class="form-control @error('password') is-invalid @enderror"
-                                   id="password" name="password" placeholder="Minimum 8 characters" required>
+                                   id="password" name="password" placeholder="Create a strong password" required>
+                        </div>
+                        <div class="form-text">
+                            <small>Password must contain:
+                                <ul class="mb-0 ps-3">
+                                    <li>At least 8 characters</li>
+                                    <li>Uppercase and lowercase letters</li>
+                                    <li>At least one number</li>
+                                    <li>At least one special character (!@#$%^&*)</li>
+                                </ul>
+                            </small>
                         </div>
                         @error('password')
                         <div class="text-danger small mt-1">{{ $message }}</div>
