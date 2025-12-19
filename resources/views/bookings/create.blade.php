@@ -19,7 +19,7 @@
                     @else
                         <form id="searchForm">
                             <div class="row mb-3">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label for="zone_id" class="form-label">Parking Zone <span
                                             class="text-danger">*</span></label>
                                     <select class="form-select" id="zone_id" name="zone_id" required>
@@ -31,10 +31,19 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label for="level_id" class="form-label">Level</label>
                                     <select class="form-select" id="level_id" name="level_id" disabled>
                                         <option value="">All levels</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="slot_type" class="form-label">Slot Type <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-select" id="slot_type" name="slot_type" required>
+                                        <option value="">Select slot type</option>
+                                        <option value="car">Car</option>
+                                        <option value="motorcycle">Motorcycle</option>
                                     </select>
                                 </div>
                             </div>
@@ -201,9 +210,11 @@
             // WEB SERVICES - Consume Vehicles API from Auth Module via Frontend AJAX
             const vehicleSelect = document.getElementById('vehicle_id');
             const vehiclesApiStatus = document.getElementById('vehicles-api-status');
+            const slotTypeSelect = document.getElementById('slot_type');
             const userId = {{ Auth::id() }};
             const requestId = 'REQ_' + Date.now();
             const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            let allVehicles = []; // Store all vehicles for filtering
 
             fetch(`/api/users/${userId}/vehicles?requestId=${requestId}&timestamp=${encodeURIComponent(timestamp)}`)
                 .then(response => {
@@ -214,18 +225,8 @@
                     console.log('Vehicles API parsed data', data);
 
                     if (data.status === 'S' && Array.isArray(data.data) && data.data.length > 0) {
-                        vehicleSelect.innerHTML = '';
-                        data.data.forEach(vehicle => {
-                            const plate = vehicle.plate_number || 'Unknown';
-                            const type = vehicle.vehicle_type ? vehicle.vehicle_type.charAt(0)
-                                .toUpperCase() + vehicle.vehicle_type.slice(1) : 'N/A';
-
-                            const option = document.createElement('option');
-                            option.value = vehicle.id || '';
-                            option.textContent = `${plate} (${type})`;
-                            if (vehicle.is_primary) option.selected = true;
-                            vehicleSelect.appendChild(option);
-                        });
+                        allVehicles = data.data;
+                        populateVehicles();
                         vehiclesApiStatus.innerHTML =
                             '<i class="fas fa-check-circle text-success"></i> Loaded via API';
                     } else {
@@ -235,6 +236,43 @@
                     }
                 })
                 .catch(error => console.error('API fetch error', error));
+
+            // Function to populate vehicles based on selected slot type
+            function populateVehicles(filterType = null) {
+                vehicleSelect.innerHTML = '';
+
+                const filteredVehicles = filterType
+                    ? allVehicles.filter(v => v.vehicle_type === filterType)
+                    : allVehicles;
+
+                if (filteredVehicles.length === 0) {
+                    vehicleSelect.innerHTML = `<option value="">No ${filterType || ''} vehicles found</option>`;
+                    return;
+                }
+
+                filteredVehicles.forEach(vehicle => {
+                    const plate = vehicle.plate_number || 'Unknown';
+                    const type = vehicle.vehicle_type ? vehicle.vehicle_type.charAt(0)
+                        .toUpperCase() + vehicle.vehicle_type.slice(1) : 'N/A';
+
+                    const option = document.createElement('option');
+                    option.value = vehicle.id || '';
+                    option.textContent = `${plate} (${type})`;
+                    option.dataset.vehicleType = vehicle.vehicle_type;
+                    if (vehicle.is_primary) option.selected = true;
+                    vehicleSelect.appendChild(option);
+                });
+            }
+
+            // Filter vehicles when slot type changes
+            slotTypeSelect.addEventListener('change', function() {
+                const selectedType = this.value;
+                if (selectedType) {
+                    populateVehicles(selectedType);
+                } else {
+                    populateVehicles();
+                }
+            });
 
 
 
@@ -289,8 +327,7 @@
                                 data.levels.forEach(level => {
                                     const option = document.createElement('option');
                                     option.value = level.id;
-                                    option.textContent =
-                                        `${level.level_name} (${level.available_slots} available)`;
+                                    option.textContent = level.level_name;
                                     levelSelect.appendChild(option);
                                 });
                             }
@@ -303,6 +340,12 @@
             // Search for available slots
             searchForm.addEventListener('submit', function(e) {
                 e.preventDefault();
+
+                // Validate slot type is selected
+                if (!slotTypeSelect.value) {
+                    alert('Please select a slot type (Car or Motorcycle)');
+                    return;
+                }
 
                 searchResults.style.display = 'none';
                 noResults.style.display = 'none';
@@ -342,19 +385,38 @@
             function renderSlots(slots, feeFormatted) {
                 slotsContainer.innerHTML = '';
 
-                slots.forEach(slot => {
-                    const col = document.createElement('div');
-                    col.className = 'col-md-4 col-6 mb-3';
-                    col.innerHTML = `
-                <div class="card slot-card h-100" data-slot-id="${slot.id}" data-slot-label="${slot.slot_id}" data-zone="${slot.zone.zone_name}" style="cursor: pointer;">
-                    <div class="card-body text-center">
-                        <i class="fas fa-parking fa-2x text-success mb-2"></i>
-                        <h6 class="mb-1">${slot.slot_id}</h6>
-                        <small class="text-muted">${slot.parking_level ? slot.parking_level.level_name : 'Ground'}</small>
+                // Group slots by type - treat 'regular' and 'Car' as car, 'Motorcycle' as motorcycle
+                const slotsByType = {
+                    car: slots.filter(s => s.type === 'car' || s.type === 'Car' || s.type === 'regular' || !s.type),
+                    motorcycle: slots.filter(s => s.type === 'Motorcycle')
+                };
+
+                // Render each type group
+                Object.entries(slotsByType).forEach(([type, typeSlots]) => {
+                    if (typeSlots.length === 0) return;
+
+                    const typeHeader = document.createElement('div');
+                    typeHeader.className = 'col-12 mt-3 mb-2';
+                    typeHeader.innerHTML = `<h6 class="text-muted text-uppercase">
+                        <i class="fas fa-${type === 'motorcycle' ? 'motorcycle' : 'car'} me-2"></i>
+                        ${type.charAt(0).toUpperCase() + type.slice(1)} Slots (${typeSlots.length})
+                    </h6>`;
+                    slotsContainer.appendChild(typeHeader);
+
+                    typeSlots.forEach(slot => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 col-6 mb-3';
+                        col.innerHTML = `
+                    <div class="card slot-card h-100" data-slot-id="${slot.id}" data-slot-label="${slot.slot_id}" data-zone="${slot.zone.zone_name}" data-slot-type="${slot.type || 'regular'}" style="cursor: pointer;">
+                        <div class="card-body text-center">
+                            <i class="fas fa-${type === 'motorcycle' ? 'motorcycle' : 'parking'} fa-2x text-success mb-2"></i>
+                            <h6 class="mb-1">${slot.slot_id}</h6>
+                            <small class="text-muted">${slot.parking_level ? slot.parking_level.level_name : 'Ground'}</small>
+                        </div>
                     </div>
-                </div>
-            `;
-                    slotsContainer.appendChild(col);
+                `;
+                        slotsContainer.appendChild(col);
+                    });
                 });
 
                 // Add click handlers to slots
@@ -370,6 +432,21 @@
             }
 
             function selectSlot(slotId, slotLabel, zoneName, feeFormatted) {
+                // Validate vehicle type matches slot type
+                const selectedSlotCard = document.querySelector(`.slot-card[data-slot-id="${slotId}"]`);
+                const slotType = selectedSlotCard.dataset.slotType;
+                const selectedVehicleOption = vehicleSelect.options[vehicleSelect.selectedIndex];
+                const vehicleType = selectedVehicleOption?.dataset?.vehicleType;
+
+                // Treat 'regular' and 'Car' as car type, 'Motorcycle' as motorcycle type
+                const normalizedSlotType = (slotType === 'regular' || slotType === 'Car') ? 'car' :
+                                          (slotType === 'Motorcycle') ? 'motorcycle' : slotType;
+
+                if (normalizedSlotType && vehicleType && normalizedSlotType !== vehicleType) {
+                    alert(`This is a ${normalizedSlotType} slot. Please select a ${normalizedSlotType} vehicle or choose a different slot.`);
+                    return;
+                }
+
                 document.getElementById('selected_slot_id').value = slotId;
                 document.getElementById('booking_date').value = document.getElementById('date').value;
                 document.getElementById('booking_start_time').value = document.getElementById('start_time').value;

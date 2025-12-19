@@ -10,7 +10,6 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
 
 class BookingService
 {
@@ -22,7 +21,8 @@ class BookingService
         ?int $levelId,
         string $date,
         string $startTime,
-        string $endTime
+        string $endTime,
+        ?string $slotType = null
     ): Collection {
         $query = ParkingSlot::query()
             ->with(['zone', 'parkingLevel'])
@@ -31,6 +31,15 @@ class BookingService
 
         if ($levelId) {
             $query->where('level_id', $levelId);
+        }
+
+        if ($slotType) {
+            // Treat 'regular' and 'Car' as car type, 'Motorcycle' as motorcycle type
+            if ($slotType === 'car') {
+                $query->whereIn('type', ['car', 'Car', 'regular']);
+            } elseif ($slotType === 'motorcycle') {
+                $query->where('type', 'Motorcycle');
+            }
         }
 
         $slots = $query->get();
@@ -207,12 +216,12 @@ class BookingService
                 'timestamp' => now()->format('Y-m-d H:i:s')
             ]);
 
-            \Log::info("BookingService API response for slot {$slotId}: " . $response->body());
+            logger()->info("BookingService API response for slot {$slotId}: " . $response->body());
 
             return $response->json();
 
         } catch (\Exception $e) {
-            \Log::error("BookingService API call failed: " . $e->getMessage());
+            logger()->error("BookingService API call failed: " . $e->getMessage());
             return null;
         }
     }

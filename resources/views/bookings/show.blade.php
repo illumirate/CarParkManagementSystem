@@ -33,6 +33,17 @@
                                 <td class="text-muted">Slot ID</td>
                                 <td><strong class="fs-5">{{ $booking->parkingSlot->slot_id }}</strong></td>
                             </tr>
+                            <tr>
+                                <td class="text-muted">Slot Type</td>
+                                <td>
+                                    @php
+                                        $slotType = $booking->parkingSlot->type ?? 'regular';
+                                        $displayType = ($slotType === 'regular' || $slotType === 'Car') ? 'Car' : 'Motorcycle';
+                                    @endphp
+                                    <i class="fas fa-{{ $displayType === 'Car' ? 'car' : 'motorcycle' }} me-1"></i>
+                                    <strong>{{ $displayType }}</strong>
+                                </td>
+                            </tr>
                         </table>
                     </div>
                     <div class="col-md-6">
@@ -194,17 +205,35 @@
                 </div>
                 <div class="modal-body">
                     <p>Select a different vehicle for this booking:</p>
+                    @php
+                        $slotType = $booking->parkingSlot->type ?? 'regular';
+                        $requiredVehicleType = ($slotType === 'regular' || $slotType === 'Car') ? 'car' : 'motorcycle';
+                        $filteredVehicles = $vehicles->filter(function($v) use ($requiredVehicleType) {
+                            return $v->vehicle_type === $requiredVehicleType;
+                        });
+                    @endphp
 
-                    <div class="mb-3">
-                        <label for="vehicle_id" class="form-label">Vehicle <span class="text-danger">*</span></label>
-                        <select class="form-select" name="vehicle_id" id="vehicle_id" required>
-                            @foreach($vehicles as $vehicle)
-                            <option value="{{ $vehicle->id }}" {{ $booking->vehicle_id == $vehicle->id ? 'selected' : '' }}>
-                                {{ $vehicle->plate_number }} ({{ ucfirst($vehicle->vehicle_type) }}) - {{ $vehicle->brand }} {{ $vehicle->model }}
-                            </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @if($filteredVehicles->isEmpty())
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            You don't have any {{ $requiredVehicleType }} vehicles registered. This slot requires a {{ $requiredVehicleType }}.
+                        </div>
+                    @else
+                        <div class="alert alert-info small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            This is a <strong>{{ ($slotType === 'regular' || $slotType === 'Car') ? 'Car' : 'Motorcycle' }}</strong> slot. Only {{ $requiredVehicleType }} vehicles are shown.
+                        </div>
+                        <div class="mb-3">
+                            <label for="vehicle_id" class="form-label">Vehicle <span class="text-danger">*</span></label>
+                            <select class="form-select" name="vehicle_id" id="vehicle_id" required>
+                                @foreach($filteredVehicles as $vehicle)
+                                <option value="{{ $vehicle->id }}" {{ $booking->vehicle_id == $vehicle->id ? 'selected' : '' }}>
+                                    {{ $vehicle->plate_number }} ({{ ucfirst($vehicle->vehicle_type) }}) - {{ $vehicle->brand }} {{ $vehicle->model }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

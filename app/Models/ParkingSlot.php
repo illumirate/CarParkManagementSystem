@@ -11,6 +11,7 @@ class ParkingSlot extends Model
         'slot_id',
         'zone_id',
         'level_id',
+        'type',
         'status',
     ];
 

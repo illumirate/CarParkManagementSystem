@@ -82,6 +82,7 @@ class BookingController extends Controller
             'date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
+            'slot_type' => 'nullable|in:car,motorcycle',
         ]);
 
         // Validate end time is before 10 PM
@@ -118,7 +119,8 @@ class BookingController extends Controller
             $request->level_id,
             $request->date,
             $request->start_time,
-            $request->end_time
+            $request->end_time,
+            $request->slot_type
         );
 
         $fee = Booking::calculateFee($request->start_time, $request->end_time);
@@ -214,9 +216,8 @@ class BookingController extends Controller
                 'confirmed_at' => now(),
             ]);
 
-            // Update slot status
-            $slot->update(['status' => 'booked']);
-
+            // Note: Slot status remains 'available' - availability is determined by booking conflicts
+            // The hasBookingConflict() method checks for date/time 
             // Send booking confirmation email
             $user->notify(new BookingConfirmation($booking));
 
@@ -335,11 +336,10 @@ class BookingController extends Controller
      */
     public function getLevels(Zone $zone): JsonResponse
     {
-        $levels = $zone->parkingLevels()->with('parkingSlots')->get()->map(function ($level) {
+        $levels = $zone->parkingLevels()->get()->map(function ($level) {
             return [
                 'id' => $level->id,
                 'level_name' => $level->level_name,
-                'available_slots' => $level->parkingSlots->where('status', 'available')->count(),
             ];
         });
 
