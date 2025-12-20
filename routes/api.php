@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\BookingApiController;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\SlotApiController;
+use App\Http\Controllers\Api\SupportApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,6 +21,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/bookings', [BookingApiController::class, 'getBookings']);
 Route::get('/bookings/stats', [BookingApiController::class, 'getBookingStats']);
 Route::get('/slots/{slotId}/active-bookings', action: [BookingApiController::class, 'getActiveBookingsForSlot']);
+
+// ==================== LIVE SUPPORT MODULE APIs ====================
+// Exposed: For other modules to create support tickets from booking issues
+Route::post('/support/tickets/booking-issue', [SupportApiController::class, 'createBookingTicket']);
+Route::get('/support/tickets/booking-report', [SupportApiController::class, 'getBookingReport']);
 
 // ==================== AUTHENTICATION MODULE APIs ====================
 // Exposed: For other modules to get user's vehicles

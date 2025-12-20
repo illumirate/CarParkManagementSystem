@@ -82,6 +82,26 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(CreditTransaction::class);
     }
 
+    public function supportTeamMemberProfile()
+    {
+        return $this->hasOne(SupportTeamMember::class);
+    }
+
+    public function supportTickets()
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
+    public function assignedSupportTickets()
+    {
+        return $this->hasMany(SupportTicket::class, 'assigned_to_user_id');
+    }
+
+    public function supportTicketMessages()
+    {
+        return $this->hasMany(SupportTicketMessage::class, 'sender_user_id');
+    }
+
     // ==================== HELPER METHODS ====================
 
     public function isAdmin(): bool

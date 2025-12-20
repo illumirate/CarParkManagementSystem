@@ -5,6 +5,14 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SupportHelpController;
+use App\Http\Controllers\SupportHelpAdminController;
+use App\Http\Controllers\SupportInboxController;
+use App\Http\Controllers\SupportEmergencyController;
+use App\Http\Controllers\SupportNotificationController;
+use App\Http\Controllers\SupportReplyTemplateController;
+use App\Http\Controllers\SupportTicketAttachmentController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\SlotController;
@@ -84,6 +92,24 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('credits/process', [PaymentController::class, 'processPayment'])->name('credits.process');
     Route::get('credits/success', [PaymentController::class, 'success'])->name('credits.success');
     Route::get('payments', [PaymentController::class, 'history'])->name('payments.history');
+
+    // Live Support (User)
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('help', [SupportHelpController::class, 'index'])->name('help');
+        Route::get('emergency', [SupportEmergencyController::class, 'create'])->name('emergency.create');
+        Route::post('emergency', [SupportEmergencyController::class, 'store'])->name('emergency.store');
+        Route::get('tickets', [SupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/create', [SupportTicketController::class, 'create'])->name('tickets.create');
+        Route::post('tickets', [SupportTicketController::class, 'store'])->name('tickets.store');
+        Route::get('tickets/{ticket}', [SupportTicketController::class, 'show'])->name('tickets.show');
+        Route::get('tickets/{ticket}/messages', [SupportTicketController::class, 'messages'])->name('tickets.messages.index');
+        Route::post('tickets/{ticket}/messages', [SupportTicketController::class, 'storeMessage'])->name('tickets.messages.store');
+        Route::post('tickets/{ticket}/messages/{message}/delete', [SupportTicketController::class, 'deleteMessage'])
+            ->name('tickets.messages.delete');
+        Route::post('tickets/{ticket}/close', [SupportTicketController::class, 'close'])->name('tickets.close');
+        Route::get('tickets/{ticket}/attachments/{attachment}', [SupportTicketAttachmentController::class, 'show'])
+            ->name('tickets.attachments.show');
+    });
 });
 
 // ==================== ADMIN ROUTES ====================
@@ -133,9 +159,45 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
 
 });
 
+// ==================== SUPPORT AGENT ROUTES (Admin/Staff) ====================
+Route::middleware(['auth', 'active', 'support_agent'])->prefix('admin/support')->name('admin.support.')->group(function () {
+    Route::get('tickets', [SupportInboxController::class, 'index'])->name('tickets.index');
+    Route::get('tickets/{ticket}', [SupportInboxController::class, 'show'])->name('tickets.show');
+    Route::post('tickets/{ticket}/assign', [SupportInboxController::class, 'assignToMe'])->name('tickets.assign');
+    Route::get('tickets/{ticket}/messages', [SupportInboxController::class, 'messages'])->name('tickets.messages.index');
+    Route::post('tickets/{ticket}/messages', [SupportInboxController::class, 'storeMessage'])->name('tickets.messages.store');
+    Route::post('tickets/{ticket}/messages/{message}/delete', [SupportInboxController::class, 'deleteMessage'])
+        ->name('tickets.messages.delete');
+    Route::post('tickets/{ticket}/status', [SupportInboxController::class, 'updateStatus'])->name('tickets.status');
+    Route::get('tickets/{ticket}/attachments/{attachment}', [SupportTicketAttachmentController::class, 'show'])
+        ->name('tickets.attachments.show');
+
+    // Notifications (Admin/Staff)
+    Route::get('notifications', [SupportNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/{id}/read', [SupportNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('notifications/{id}/delete', [SupportNotificationController::class, 'destroy'])->name('notifications.delete');
+
+    // Canned replies (Admin/Staff)
+    Route::get('templates', [SupportReplyTemplateController::class, 'index'])->name('templates.index');
+    Route::get('templates/create', [SupportReplyTemplateController::class, 'create'])->name('templates.create');
+    Route::post('templates', [SupportReplyTemplateController::class, 'store'])->name('templates.store');
+    Route::get('templates/{template}/edit', [SupportReplyTemplateController::class, 'edit'])->name('templates.edit');
+    Route::put('templates/{template}', [SupportReplyTemplateController::class, 'update'])->name('templates.update');
+    Route::delete('templates/{template}', [SupportReplyTemplateController::class, 'destroy'])->name('templates.destroy');
+    Route::post('templates/{template}/toggle', [SupportReplyTemplateController::class, 'toggle'])->name('templates.toggle');
+
+    // Help documentation management (Admin/Staff)
+    Route::get('help', [SupportHelpAdminController::class, 'index'])->name('help.index');
+    Route::get('help/create', [SupportHelpAdminController::class, 'create'])->name('help.create');
+    Route::post('help', [SupportHelpAdminController::class, 'store'])->name('help.store');
+    Route::get('help/{article}/edit', [SupportHelpAdminController::class, 'edit'])->name('help.edit');
+    Route::put('help/{article}', [SupportHelpAdminController::class, 'update'])->name('help.update');
+    Route::delete('help/{article}', [SupportHelpAdminController::class, 'destroy'])->name('help.destroy');
+    Route::post('help/{article}/toggle', [SupportHelpAdminController::class, 'togglePublish'])->name('help.toggle');
+});
+
 // ==================== API ROUTES (for AJAX) ====================
 Route::middleware(['auth'])->prefix('api')->group(function () {
     Route::get('zones/{zone}/levels', [BookingController::class, 'getLevels'])->name('api.zones.levels');
     Route::get('slots/availability', [BookingController::class, 'getSlotAvailability'])->name('api.slots.availability');
 });
-

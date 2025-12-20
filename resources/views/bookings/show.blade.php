@@ -133,15 +133,30 @@
                 </div>
             </div>
             <div class="card-footer bg-transparent">
+                <div id="reportInfo" class="alert alert-info d-flex align-items-center justify-content-between d-none">
+                    <div>
+                        <div class="fw-semibold">Report submitted</div>
+                        <div class="small">Report ID: <span id="reportId"></span></div>
+                        <div class="small">Report Type: <span id="reportType"></span></div>
+                    </div>
+                    <a id="reportLink" class="btn btn-outline-primary btn-sm" href="#">
+                        View Ticket
+                    </a>
+                </div>
                 <div class="d-flex justify-content-between">
                     <a href="{{ route('bookings.index') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i>Back to Bookings
                     </a>
-                    @if($booking->canBeCancelled())
-                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                        <i class="fas fa-times me-1"></i>Cancel Booking
-                    </button>
-                    @endif
+                    <div class="d-flex gap-2">
+                        <button type="button" id="reportIssueBtn" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#reportIssueModal">
+                            <i class="fas fa-headset me-1"></i>Report Issue
+                        </button>
+                        @if($booking->canBeCancelled())
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                            <i class="fas fa-times me-1"></i>Cancel Booking
+                        </button>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -190,6 +205,49 @@
     </div>
 </div>
 @endif
+
+{{-- Report Issue Modal --}}
+<div class="modal fade" id="reportIssueModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="bookingIssueForm">
+                <div class="modal-header">
+                    <h5 class="modal-title">Report Parking Issue</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="booking_id" value="{{ $booking->id }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Issue Type</label>
+                        <select name="issue_type" class="form-select" required>
+                            <option value="" disabled selected>Select one...</option>
+                            <option value="Slot Occupied">Slot Occupied</option>
+                            <option value="Wrong Slot Shown">Wrong Slot Shown</option>
+                            <option value="Slot Blocked">Slot Blocked</option>
+                            <option value="Access Issue">Access Issue</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea name="message" class="form-control" rows="3"
+                                  placeholder="Describe what happened..."></textarea>
+                    </div>
+
+                    <div id="issueError" class="alert alert-danger d-none mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i>Submit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 {{-- Change Vehicle Modal --}}
 @if($booking->canBeModified())
@@ -245,3 +303,96 @@
 </div>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const form = document.getElementById('bookingIssueForm');
+        if (!form) return;
+        const errorBox = document.getElementById('issueError');
+        const reportInfo = document.getElementById('reportInfo');
+        const reportId = document.getElementById('reportId');
+        const reportType = document.getElementById('reportType');
+        const reportLink = document.getElementById('reportLink');
+        const reportButton = document.getElementById('reportIssueBtn');
+        const modalEl = document.getElementById('reportIssueModal');
+        const bookingId = form.querySelector('[name="booking_id"]')?.value;
+
+        function showReport(data) {
+            if (!data?.ticket_id) return;
+            if (reportId) reportId.textContent = data.ticket_number || String(data.ticket_id);
+            if (reportType) reportType.textContent = data.issue_type || '';
+            if (reportLink) reportLink.href = `/support/tickets/${data.ticket_id}`;
+            if (reportInfo) reportInfo.classList.remove('d-none');
+            if (reportButton) reportButton.classList.add('d-none');
+        }
+
+        async function fetchReportInfo() {
+            if (!bookingId) return;
+            try {
+                const res = await fetch(`/api/support/tickets/booking-report?booking_id=${encodeURIComponent(bookingId)}`, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data?.exists) {
+                    showReport(data);
+                }
+            } catch (err) {
+                // ignore
+            }
+        }
+
+        fetchReportInfo();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (errorBox) {
+                errorBox.classList.add('d-none');
+                errorBox.textContent = '';
+            }
+
+            const payload = {
+                booking_id: form.querySelector('[name="booking_id"]')?.value,
+                issue_type: form.querySelector('[name="issue_type"]')?.value,
+                message: form.querySelector('[name="message"]')?.value,
+            };
+
+            try {
+                const res = await fetch('/api/support/tickets/booking-issue', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    const msg = data?.message || data?.errors?.issue_type?.[0] || 'Failed to submit issue.';
+                    if (errorBox) {
+                        errorBox.textContent = msg;
+                        errorBox.classList.remove('d-none');
+                    }
+                    return;
+                }
+
+                const data = await res.json();
+                if (data?.ticket_id) {
+                    showReport(data);
+                    if (modalEl) {
+                        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                        modal.hide();
+                    }
+                }
+            } catch (err) {
+                if (errorBox) {
+                    errorBox.textContent = 'Failed to submit issue. Please try again.';
+                    errorBox.classList.remove('d-none');
+                }
+            }
+        });
+    })();
+</script>
+@endpush
