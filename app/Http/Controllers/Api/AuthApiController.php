@@ -1,4 +1,5 @@
 <?php
+//  Author: Leo Chia Chuen
 
 namespace App\Http\Controllers\Api;
 
@@ -63,7 +64,7 @@ class AuthApiController extends Controller
                     'brand' => $vehicle->brand,
                     'model' => $vehicle->model,
                     'color' => $vehicle->color,
-                    'vehicle_type' => $vehicle->vehicle_type, 
+                    'vehicle_type' => $vehicle->vehicle_type,
                 ];
             });
 

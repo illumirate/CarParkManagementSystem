@@ -1,4 +1,5 @@
 <?php
+//  Author: Ng Ian Kai
 
 namespace App\Http\Controllers;
 
@@ -217,7 +218,7 @@ class BookingController extends Controller
             ]);
 
             // Note: Slot status remains 'available' - availability is determined by booking conflicts
-            // The hasBookingConflict() method checks for date/time 
+            // The hasBookingConflict() method checks for date/time
             // Send booking confirmation email
             $user->notify(new BookingConfirmation($booking));
 

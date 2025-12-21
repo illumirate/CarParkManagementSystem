@@ -1,3 +1,5 @@
+{{-- Author: Leo Chia Chuen --}}
+
 @extends('layout')
 
 @section('title', 'Verify Email - TARUMT Car Park')
