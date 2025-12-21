@@ -95,7 +95,7 @@ class BookingApiController extends Controller
      * EXPOSED API: Get booking statistics for a user
      *
      * Endpoint: GET /api/bookings/stats
-     * Target Modules: Authentication Module (User Profile)
+     * Target Modules: Authentication Module (Dashboard)
      */
     public function getBookingStats(Request $request): JsonResponse
     {

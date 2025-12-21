@@ -18,9 +18,8 @@ use Illuminate\Support\Facades\Route;
 
 // ==================== BOOKING MODULE APIs ====================
 // Exposed: For other modules to consume booking data
-Route::get('/bookings', [BookingApiController::class, 'getBookings']);
 Route::get('/bookings/stats', [BookingApiController::class, 'getBookingStats']);
-Route::get('/slots/{slotId}/active-bookings', action: [BookingApiController::class, 'getActiveBookingsForSlot']);
+Route::get('/bookings/slot/{slotId}/active', [BookingApiController::class, 'getActiveBookingsForSlot']);
 
 // ==================== LIVE SUPPORT MODULE APIs ====================
 // Exposed: For other modules to create support tickets from booking issues

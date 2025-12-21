@@ -211,7 +211,7 @@ class BookingService
     public static function getActiveBookingsForSlot($slotId)
     {
         try {
-            $response = Http::get(config('services.booking.url') . "/api/slots/{$slotId}/active-bookings", [
+            $response = Http::get(config('services.booking.url') . "/api/bookings/slot/{$slotId}/active", [
                 'requestId' => (string) Str::uuid(),
                 'timestamp' => now()->format('Y-m-d H:i:s')
             ]);

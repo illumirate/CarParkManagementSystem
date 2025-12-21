@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Contracts\ObserverInterface;
 use App\Models\User;
 use App\Observers\Auth\LastLoginObserver;
 use App\Observers\Auth\UserEventSubject;
